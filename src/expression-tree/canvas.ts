@@ -1,5 +1,6 @@
-import { setCoordinates, drawTree, constructTree } from './tree.ts'
-import { infixToPostfix } from './infixToPostfix.ts';
+import { Node, setCoordinates, drawTree, constructTree } from './tree'
+import { infixToPostfix } from './infixToPostfix';
+import Swal from 'sweetalert2';
 
 (function () {
     const SAMPLE_EXPRESSIONS = [
@@ -10,41 +11,50 @@ import { infixToPostfix } from './infixToPostfix.ts';
         '(a - b) * (c + d) / z',
         '(a * b) - (x / y)'
     ]
-    const canvas = document.querySelector('canvas')
-    const c = canvas.getContext('2d')
-    let currentRoot = null;
-    function clearCanvas() { c.clearRect(0, 0, canvas.width, canvas.height) }
+    const canvas = document.querySelector('canvas') as HTMLCanvasElement;
+    const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+    const expressionInput = document.getElementById('expression-input') as HTMLInputElement;
+    if (!canvas) {
+        console.error("Could not find the canvas element in the DOM!");
+        return;
+    }
+    if (!ctx){
+        console.error("Canvas Context is missing!");
+        return
+    }
+    let currentRoot : Node | null = null;
+    function clearCanvas() { 
+        ctx.clearRect(0, 0, canvas.width, canvas.height) }
 
     function render() {
         // 1. Resize the canvas to match its HTML container layout
         const container = document.getElementById('canvas-container');
+        if (!container){
+            console.log("Container is missing!");
+            return;
+        }
         canvas.height = container.offsetHeight;
         canvas.width = container.offsetWidth;
-
-        // 2. Wipe the pixel buffer clean
         clearCanvas();
-
-        // 3. If a tree has been loaded, recalculate layout and draw it
         if (currentRoot) {
             setCoordinates(currentRoot);
-            drawTree(currentRoot, c);
+            drawTree(currentRoot, ctx);
         }
     }
-
-    document.getElementById('generate-tree').addEventListener('click', () => {
-        let expression = document.getElementById('expression-input').value
+    document.getElementById('generate-tree')!.addEventListener('click', () => {
+        let expression = expressionInput.value
         if (typeof expression !== 'undefined' && null != expression) {
             expression = expression.replace(/\s+/g, '')
             expression = expression.toLowerCase()
             let postfix = infixToPostfix(expression);
             if (null !== postfix) {
                 try {
-                    currentRoot = constructTree(postfix)
+                    currentRoot = constructTree(postfix) as Node
                     setCoordinates(currentRoot)
                     clearCanvas()
-                    canvas.height = document.getElementById('canvas-container').offsetHeight;
-                    canvas.width = document.getElementById('canvas-container').offsetWidth;
-                    drawTree(currentRoot, c)
+                    canvas.height = document.getElementById('canvas-container')!.offsetHeight;
+                    canvas.width = document.getElementById('canvas-container')!.offsetWidth;
+                    drawTree(currentRoot, ctx)
                 } catch (e) {
                     displayErrorMessage()
                 }
@@ -57,15 +67,15 @@ import { infixToPostfix } from './infixToPostfix.ts';
         }
     })
 
-    document.getElementById('clear-tree').addEventListener('click', () => {
-        document.getElementById('expression-input').value = ''
+    document.getElementById('clear-tree')!.addEventListener('click', () => {
+        expressionInput.value = ''
         clearCanvas()
     })
     window.addEventListener('resize', render);
 
-    document.getElementById('expression-input').value = SAMPLE_EXPRESSIONS[Math.floor(Math.random() * SAMPLE_EXPRESSIONS.length)]
+    expressionInput.value = SAMPLE_EXPRESSIONS[Math.floor(Math.random() * SAMPLE_EXPRESSIONS.length)]
     setTimeout(() => {
-        document.getElementById('generate-tree').click()
+        document.getElementById('generate-tree')!.click()
     }, 500)
 })();
 

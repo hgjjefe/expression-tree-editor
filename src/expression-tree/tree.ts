@@ -1,7 +1,12 @@
 const radius = 32.5;
 
 class Node {
-    constructor(value){
+    value: string;
+    x: number | null;
+    y: number | null;
+    left: Node | null;
+    right: Node | null;
+    constructor(value: string){
         this.value = value;
         this.x = null;
         this.y = null;
@@ -13,29 +18,29 @@ class Node {
         return this.right == null && this.left == null;
     }
 
-    drawEdge(context, x, y, left_way) {
+    drawEdge(context: CanvasRenderingContext2D, x: number, y: number, left_way: boolean) {
         // Helper method
-        function drawEdgeInstant(origin_x, origin_y, destine_x, destine_y, ctx) {
+        function drawEdgeInstant(origin_x: number, origin_y: number, destine_x: number, destine_y: number, ctx: CanvasRenderingContext2D) {
             ctx.beginPath();
             ctx.moveTo(origin_x, origin_y);
             ctx.lineTo(destine_x, destine_y);
             ctx.stroke();
         }
         context.strokeStyle = 'gray';
-        const x_y_ratio = Math.abs(this.y - y) / Math.abs(this.x - x);
+        const x_y_ratio = Math.abs(this.y! - y) / Math.abs(this.x! - x);
         const w = radius * Math.sqrt(1 / (1 + Math.pow(x_y_ratio, 2)));
         const d = x_y_ratio * w;
         
         if (left_way) {
-            drawEdgeInstant(this.x - w, this.y + d, x + w, y - d, context);
+            drawEdgeInstant(this.x! - w, this.y! + d, x + w, y - d, context);
         } else {
-            drawEdgeInstant(this.x + w, this.y + d, x - w, y - d, context);
+            drawEdgeInstant(this.x! + w, this.y! + d, x - w, y - d, context);
         }
     }
 
-    drawNode(context) {
+    drawNode(context: CanvasRenderingContext2D) {
         context.beginPath();
-        context.arc(this.x, this.y, radius, 0, Math.PI * 2, false);
+        context.arc(this.x!, this.y!, radius, 0, Math.PI * 2, false);
         context.fillStyle = 'white';
         context.fill();
         context.strokeStyle = '#212121';
@@ -44,15 +49,15 @@ class Node {
         context.textAlign = 'center';
         context.textBaseline = 'middle';
         context.fillStyle = "#212121";
-        context.fillText(this.value, this.x, this.y);
+        context.fillText(this.value, this.x!, this.y!);
     };
 }
 
 // type: String[] -> Node
-function constructTree(postfix) {
+function constructTree(postfix: string[]) {
     const OPERATORS = ['*', '/', '-', '+'];
     let stack = [];
-    let root = null;
+    let root: Node | null = null;
     let current;
     let shift = false;
     for (let i = postfix.length - 1; i >= 0; i--) {
@@ -62,11 +67,11 @@ function constructTree(postfix) {
         } else {
             if (shift) {
                 current.left = new Node(postfix[i]);
-                current = current.left;
+                current = current!.left;
                 shift = false;
             } else {
                 current.right = new Node(postfix[i]);
-                current = current.right;
+                current = current!.right;
             }
         }
         if (OPERATORS.includes(postfix[i])) {
@@ -79,58 +84,58 @@ function constructTree(postfix) {
     return root;
 }
 
-function getSize(root) {
+function getSize(root: Node) {
     let size = 0;
-    function countSize(root) {
+    function countSize(root: Node) {
         if (null != root) {
             size++;
-            countSize(root.left);
-            countSize(root.right);
+            countSize(root.left!);
+            countSize(root.right!);
         }
     }
     countSize(root);
     return size;
 }
 
-function print_coords(root) {
+function print_coords(root: Node) {
     if (null != root) {
-        print_coords(root.left);
+        print_coords(root.left!);
         console.log(root.value, root.x, root.y);
-        print_coords(root.right);
+        print_coords(root.right!);
     }
 }
 
-function setCoordinates(root) {
+function setCoordinates(root: Node) {
     let i = 0;
     const OFFSET = 50;
     const size = getSize(root);
     const canvas_mid_point = window.innerWidth / 2;
-    function setCoordinates(subt, depth) {
+    function setCoordinates(subt: Node, depth: number) {
         if (null != subt) {
-            setCoordinates(subt.left, depth + 1);
+            setCoordinates(subt.left!, depth + 1);
             subt.x = canvas_mid_point + (OFFSET * (i - size / 2));
             subt.y = 1.75 * OFFSET + (depth * 1.5 * OFFSET);
             i++;
-            setCoordinates(subt.right, depth + 1);
+            setCoordinates(subt.right!, depth + 1);
         }
     }
     setCoordinates(root, 0);
 }
 
-function drawTree(root, context) {
+function drawTree(root: Node, context: CanvasRenderingContext2D) {
     if (null != root) {
         root.drawNode(context);
         
         if (null != root.left) {
-            root.drawEdge(context, root.left.x, root.left.y, true);
+            root.drawEdge(context, root.left.x!, root.left.y!, true);
             drawTree(root.left, context);
         }
         
         if (null != root.right) {
-            root.drawEdge(context, root.right.x, root.right.y, false);
+            root.drawEdge(context, root.right.x!, root.right.y!, false);
             drawTree(root.right, context);
         }
     }
 }
 
-export { setCoordinates, drawTree, constructTree };
+export { Node, setCoordinates, drawTree, constructTree };

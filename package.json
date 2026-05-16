@@ -11,5 +11,9 @@
   "devDependencies": {
     "typescript": "~6.0.2",
     "vite": "^8.0.12"
+  },
+  "dependencies": {
+    "mathjs": "^15.2.0",
+    "sweetalert2": "^11.26.24"
   }
 }

@@ -1,4 +1,7 @@
-function isBracketed(expr) {
+import { create, all } from 'mathjs';
+const math = create(all);
+
+function isBracketed(expr: string) {
   let stack = []
   for (let i = 0; i < expr.length; i++) {
     if ('(' === expr[i]) {
@@ -17,7 +20,7 @@ function isBracketed(expr) {
   return false;
 }
 
-function isValidExpression(expr) {
+function isValidExpression(expr: string) {
   if (expr.length < 3) {
     return false;
   }
@@ -33,7 +36,7 @@ function isValidExpression(expr) {
       } else break;
     }
     let res = math.parse(expr);
-    if ((typeof res.implicit === 'undefined') || res.fn.indexOf('unary') !== -1) {
+    if ((typeof (res as any).implicit === 'undefined') || (res as any).fn.indexOf('unary') !== -1) {
       return false;
     }
     return true;
@@ -43,11 +46,11 @@ function isValidExpression(expr) {
   }
 }
 
-export function infixToPostfix(expression) {
+export function infixToPostfix(expression: string): string[] | null {
   if (!isValidExpression(expression)) {
     return null;
   }
-  const prec = { "*": 3, "/": 3, "-": 2, "+": 2, "(": 1 }
+  const prec: { [key: string]: number } = { "*": 3, "/": 3, "-": 2, "+": 2, "(": 1 }
   let op_stack = []
   let postfixList = []
   let tokens = expression.split('')
@@ -74,5 +77,5 @@ export function infixToPostfix(expression) {
   while (op_stack.length > 0) {
     postfixList.push(op_stack.pop())
   }
-  return postfixList
+  return postfixList as string[]
 }
