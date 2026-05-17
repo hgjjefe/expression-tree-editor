@@ -82,7 +82,7 @@ export const parseExpression = (lexer: Lexer, minBp: number = 0): S => {
 
     // 2. Handle Infix Operators (e.g., '+', '?', '.')
     const bp = getInfixBP(op);
-    if ( op !== ')' && bp === null ) throw new SyntaxError(`"Invalid token: ${op}`)
+    // if ( bp === null && op !== ')' ) throw new SyntaxError(`"Invalid token: ${op}`)
     if (bp !== null) {
       const [l_bp, r_bp] = bp;
       if (l_bp < minBp) break;
