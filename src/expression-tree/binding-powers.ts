@@ -1,34 +1,30 @@
-interface InfixBP { left: number; right: number; }
-interface PrefixBP  { right: number; }
-interface PostfixBP { left: number; }
-// type BindingPower = InfixBP | PrefixBP | PostfixBP;
 
 // Dictionary for infix binding powers
-const INFIX_BINDING_POWERS: Record<string, InfixBP> = {
-    '=': { left: 2, right: 1},
-    '+': { left: 1, right: 2 },
-    '-': { left: 1, right: 2 },
-    '*': { left: 3, right: 4 },
-    '/': { left: 3, right: 4 },
-    '^': { left: 10, right: 9 },
-    '.': { left: 11, right: 12 },
+const INFIX_BINDING_POWERS: Record<string, [number, number]> = {
+    '=': [2, 1],
+    '+': [5, 6],
+    '-': [5, 6],
+    '*': [7, 8],
+    '/': [7, 8],
+    '^': [12,11],
+    '.': [15,16],
 }
 
-const PREFIX_BINDING_POWERS: Record<string, PrefixBP> = {
-    '+': { right: 5 },
-    '-': { right: 5 },
+const PREFIX_BINDING_POWERS: Record<string, number> = {
+    '+': 9,
+    '-': 9,
 }
 
-const POSTFIX_BINDING_POWERS: Record<string, PostfixBP> = {
-    '!': { left: 7 }
+const POSTFIX_BINDING_POWERS: Record<string, number> = {
+    '!': 11
 }
 
-export const getInfixBP = (op: string): InfixBP | null => {
+export const getInfixBP = (op: string): [number, number] | null => {
     return (op in INFIX_BINDING_POWERS) ? INFIX_BINDING_POWERS[op as keyof typeof INFIX_BINDING_POWERS] : null;
 }
-export const getPrefixBP = (op: string): PrefixBP | null => {
+export const getPrefixBP = (op: string): number | null => {
     return (op in PREFIX_BINDING_POWERS) ? PREFIX_BINDING_POWERS[op as keyof typeof PREFIX_BINDING_POWERS] : null;
 }
-export const getPostfixBP = (op: string): PostfixBP | null => {
+export const getPostfixBP = (op: string): number | null => {
     return (op in POSTFIX_BINDING_POWERS) ? POSTFIX_BINDING_POWERS[op as keyof typeof POSTFIX_BINDING_POWERS] : null;
 }

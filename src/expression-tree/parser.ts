@@ -47,10 +47,10 @@ export const parseExpression = (lexer: Lexer, minBp: number = 0): S => {
     if (closeParen.type !== 'Op' || closeParen.value !== ')') throw new SyntaxError("Expected ')'");
   } 
   else if (token.type === 'Op') {
-    const prefix = getPrefixBP(token.value);
-    if (!prefix) throw new SyntaxError(`Bad prefix token: ${token.value}`);
+    const prefixBP = getPrefixBP(token.value);
+    if (prefixBP=== null) throw new SyntaxError(`Bad prefix token: ${token.value}`);
     
-    const rhs = parseExpression(lexer, prefix.right);
+    const rhs = parseExpression(lexer, prefixBP);
     lhs = { type: 'Cons', head: token.value, rest: [rhs] };
   } 
   else {
@@ -66,9 +66,9 @@ export const parseExpression = (lexer: Lexer, minBp: number = 0): S => {
     const op = nextToken.value;
 
     // 1. Handle Postfix Operators (e.g., '!', '[')
-    const postfix = getPostfixBP(op);
-    if (postfix) {
-      if (postfix.left < minBp) break;
+    const postfixBP = getPostfixBP(op);
+    if (postfixBP !== null) {
+      if (postfixBP < minBp) break;
       lexer.next(); // Consume the operator
 
       if (op === '[') {
@@ -84,18 +84,19 @@ export const parseExpression = (lexer: Lexer, minBp: number = 0): S => {
 
     // 2. Handle Infix Operators (e.g., '+', '?', '.')
     const bp = getInfixBP(op);
-    if (bp) {
-      if (bp.left < minBp) break;
+    if (bp !== null) {
+      const [l_bp, r_bp] = bp;
+      if (l_bp < minBp) break;
       lexer.next(); // Consume the operator
 
       if (op === '?') { // Ternary Operator handling
         const mhs = parseExpression(lexer, 0);
         const closeParen = lexer.next();
         if (closeParen.type !== 'Op' || closeParen.value !== ':') throw new SyntaxError("Expected ':'");
-        const rhs = parseExpression(lexer, bp.right);
+        const rhs = parseExpression(lexer, r_bp);
         lhs = { type: 'Cons', head: op, rest: [lhs, mhs, rhs] };
       } else {
-        const rhs = parseExpression(lexer, bp.right);
+        const rhs = parseExpression(lexer, r_bp);
         lhs = { type: 'Cons', head: op, rest: [lhs, rhs] };
       }
       continue;
