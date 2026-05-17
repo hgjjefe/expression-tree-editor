@@ -1,11 +1,32 @@
 import { Node, setCoordinates, drawTree, constructTree } from './tree'
-import { convertSToTree } from './tree-nary';
+import { convertSToTree, renderPipeline } from './tree-nary';
 import { infixToPostfix } from './infixToPostfix';
 import Swal from 'sweetalert2';
 import { parseExpression, formatS, type S  } from './parser'
 import { Lexer } from './lexer';
 
-(function () {
+const canvas = document.querySelector('canvas') as HTMLCanvasElement;
+const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+const expressionInput = document.getElementById('expression-input') as HTMLInputElement;
+
+// Button functions
+function generateNaryTree(){
+    let expression = expressionInput.value
+    if (typeof expression !== 'undefined' && null != expression) {
+        try {
+            let s_expr = generateS(expression);
+            printS(s_expr);
+            renderPipeline(expression, ctx)
+        } catch (e) {
+            displayErrorMessageNary()
+            console.log(e)
+        }
+    }
+}
+
+
+
+function init() {
     const SAMPLE_EXPRESSIONS = [
         '(a + b)*c - (x - y)/z',
         '(a * b) - c + z / x',
@@ -14,9 +35,7 @@ import { Lexer } from './lexer';
         '(a - b) * (c + d) / z',
         '(a * b) - (x / y)'
     ]
-    const canvas = document.querySelector('canvas') as HTMLCanvasElement;
-    const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
-    const expressionInput = document.getElementById('expression-input') as HTMLInputElement;
+    
     if (!canvas) {
         console.error("Could not find the canvas element in the DOM!");
         return;
@@ -47,11 +66,14 @@ import { Lexer } from './lexer';
     document.getElementById('generate-tree')!.addEventListener('click', () => {
         let expression = expressionInput.value
         if (typeof expression !== 'undefined' && null != expression) {
-            let s_expr = generateS(expression);
-            printS(s_expr);
-            let tree = convertSToTree(s_expr);
+            try {
+                let s_expr = generateS(expression);
+                printS(s_expr);
+                let tree = convertSToTree(s_expr);
+            } catch (e) {
+                console.log(e)
+            }
             
-
             expression = expression.replace(/\s+/g, '')
             expression = expression.toLowerCase()
             let postfix = infixToPostfix(expression);
@@ -74,6 +96,7 @@ import { Lexer } from './lexer';
             displayErrorMessage()
         }
     })
+    document.getElementById('generate-nary-tree')!.addEventListener('click', generateNaryTree);
 
     document.getElementById('clear-tree')!.addEventListener('click', () => {
         expressionInput.value = ''
@@ -85,7 +108,8 @@ import { Lexer } from './lexer';
     setTimeout(() => {
         document.getElementById('generate-tree')!.click()
     }, 500)
-})();
+};
+init();
 
 
 function generateS(input: string){
@@ -109,6 +133,25 @@ function displayErrorMessage() {
                 <div style="margin-left: 10px;">
                     <i>Operators</i>: <b>[+ - * / ]</b><br/>
                     <i>Operands</i>: Any alphabetic letter.
+                </div>
+            </div>
+        `,
+        footer: '<a href="https://github.com/lnogueir/expression-tree-gen">Learn more</a>'
+    })
+}
+
+function displayErrorMessageNary() {
+    Swal.fire({
+        icon: 'error',
+        title: 'Syntax Error!',
+        html: `
+            <div style="font-size:1.1em;text-align: left;margin:0px 0px 0px 60px;">
+                - You have some syntax error but i wont tell you why. <br/>
+                - Good luck trying to figure it out. <br/>
+                - Valid operators and operands are:<br/>
+                <div style="margin-left: 10px;">
+                    <i>Operators</i>: <b>[+ - * / ^ ]</b><br/>
+                    <i>Operands</i>: Any alphanumeric single letter.
                 </div>
             </div>
         `,
