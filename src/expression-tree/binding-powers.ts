@@ -5,6 +5,7 @@ interface PostfixBP { left: number; }
 
 // Dictionary for infix binding powers
 const INFIX_BINDING_POWERS: Record<string, InfixBP> = {
+    '=': { left: 2, right: 1},
     '+': { left: 1, right: 2 },
     '-': { left: 1, right: 2 },
     '*': { left: 3, right: 4 },
@@ -14,7 +15,8 @@ const INFIX_BINDING_POWERS: Record<string, InfixBP> = {
 }
 
 const PREFIX_BINDING_POWERS: Record<string, PrefixBP> = {
-    '~': { right: 5 },
+    '+': { right: 5 },
+    '-': { right: 5 },
 }
 
 const POSTFIX_BINDING_POWERS: Record<string, PostfixBP> = {

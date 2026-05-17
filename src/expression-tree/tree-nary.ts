@@ -1,0 +1,146 @@
+import { parseExpression, type S } from './parser';
+import { Lexer } from './lexer'
+
+/* NEW VERSION FOR S EXPRESSIONS (N-ARY TREE) */
+
+const RADIUS = 25; // Define your node size globally or pass it in
+
+export class TreeNode {
+  value: string;
+  x: number | null = null;
+  y: number | null = null;
+  children: TreeNode[] = []; // 👈 Swapped left/right out for a unified list!
+
+  constructor(value: string) {
+    this.value = value;
+  }
+
+  isLeaf(): boolean {
+    return this.children.length === 0;
+  }
+
+  /**
+   * Universal Edge Drawer
+   * Uses geometry vectors to connect circle-to-circle regardless of angle!
+   */
+  drawEdge(context: CanvasRenderingContext2D, child: TreeNode) {
+    if (this.x === null || this.y === null || child.x === null || child.y === null) return;
+
+    // 1. Calculate the distance and direction vectors between parent and child
+    const dx = child.x - this.x;
+    const dy = child.y - this.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance === 0) return; // Prevent division by zero
+
+    // 2. Unit vector components (direction coefficients)
+    const cosTheta = dx / distance;
+    const sinTheta = dy / distance;
+
+    // 3. Shift start and end points onto the outer shell of the circles using the radius
+    const startX = this.x + RADIUS * cosTheta;
+    const startY = this.y + RADIUS * sinTheta;
+    const endX = child.x - RADIUS * cosTheta;
+    const endY = child.y - RADIUS * sinTheta;
+
+    // 4. Draw the precise edge
+    context.strokeStyle = 'gray';
+    context.lineWidth = 1.5;
+    context.beginPath();
+    context.moveTo(startX, startY);
+    context.lineTo(endX, endY);
+    context.stroke();
+  }
+
+  drawNode(context: CanvasRenderingContext2D) {
+    if (this.x === null || this.y === null) return;
+
+    context.beginPath();
+    context.arc(this.x, this.y, RADIUS, 0, Math.PI * 2, false);
+    context.fillStyle = 'white';
+    context.fill();
+    context.strokeStyle = '#212121';
+    context.lineWidth = 2;
+    context.stroke();
+
+    context.font = '18px Times New Roman';
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillStyle = "#212121";
+    context.fillText(this.value, this.x, this.y);
+  }
+}
+
+export function convertSToTree(sNode: S): TreeNode {
+  if (sNode.type === 'Atom') {
+    return new TreeNode(sNode.value);
+  } 
+
+  // It's a Cons node (operator branch)
+  const visualBranch = new TreeNode(sNode.head);
+  
+  // Recursively convert all children inside the 'rest' array
+  visualBranch.children = sNode.rest.map(convertSToTree);
+  
+  return visualBranch;
+}
+
+const LEVEL_HEIGHT = 80; // Vertical distance between parent and child lines
+const LEAF_SPACING = 60; // Horizontal distance between neighboring leaf nodes
+
+export function calculateTreeLayout(root: TreeNode, startTopOffset = 50) {
+  let currentX = LEAF_SPACING; // Tracks global horizontal placement
+
+  function traverse(node: TreeNode, depth: number) {
+    // 1. Set the Y coordinate based on how deep the node is in the tree
+    node.y = depth * LEVEL_HEIGHT + startTopOffset;
+
+    // 2. Base Case: If it's a leaf node, give it the next available X slot
+    if (node.isLeaf()) {
+      node.x = currentX;
+      currentX += LEAF_SPACING; // Move the anchor right for the next leaf
+    } 
+    // 3. Recursive Case: Layout all children first, then center the parent
+    else {
+      for (const child of node.children) {
+        traverse(child, depth + 1);
+      }
+
+      // Center this parent perfectly between its first and last child
+      const firstChildX = node.children[0].x!;
+      const lastChildX = node.children[node.children.length - 1].x!;
+      node.x = (firstChildX + lastChildX) / 2;
+    }
+  }
+
+  traverse(root, 0);
+}
+
+export function drawTree(context: CanvasRenderingContext2D, node: TreeNode) {
+  // 1. Pass down through the branches to draw lines and child nodes
+  for (const child of node.children) {
+    node.drawEdge(context, child); // Draws line from this parent to this child
+    drawTree(context, child);      // Recursive call to process deeper branches
+  }
+
+  // 2. Draw the current node circle and text on top of the lines
+  node.drawNode(context);
+}
+
+function renderPipeline(rawInput: string, ctx: CanvasRenderingContext2D) {
+  // Clear the canvas window for a fresh frame
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+  // 1. Parse the string into an S-Expression Tree
+  // e.g., Outputs: { type: 'Cons', head: '+', rest: [...] }
+  const sExpressionAST = parseExpression(new Lexer(rawInput), 0);
+
+  // 2. Convert pure data nodes into drawable layout nodes
+  const visualRoot = convertSToTree(sExpressionAST);
+
+  // 3. Mutate the visual tree to append all x and y positions
+  calculateTreeLayout(visualRoot, 60);
+
+  // 4. Fire the paint loops onto the canvas context
+  drawTree(ctx, visualRoot);
+}

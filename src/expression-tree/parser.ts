@@ -33,7 +33,7 @@ export function formatS(node: S): string {
 
 
 // 2. The Core Pratt Parser Loop
-export const exprBp = (lexer: Lexer, minBp: number = 0): S => {
+export const parseExpression = (lexer: Lexer, minBp: number = 0): S => {
   const token = lexer.next();
   let lhs: S;
 
@@ -42,7 +42,7 @@ export const exprBp = (lexer: Lexer, minBp: number = 0): S => {
     lhs = { type: 'Atom', value: token.value };
   } 
   else if (token.type === 'Op' && token.value === '(') {
-    lhs = exprBp(lexer, 0);
+    lhs = parseExpression(lexer, 0);
     const closeParen = lexer.next();
     if (closeParen.type !== 'Op' || closeParen.value !== ')') throw new SyntaxError("Expected ')'");
   } 
@@ -50,7 +50,7 @@ export const exprBp = (lexer: Lexer, minBp: number = 0): S => {
     const prefix = getPrefixBP(token.value);
     if (!prefix) throw new SyntaxError(`Bad prefix token: ${token.value}`);
     
-    const rhs = exprBp(lexer, prefix.right);
+    const rhs = parseExpression(lexer, prefix.right);
     lhs = { type: 'Cons', head: token.value, rest: [rhs] };
   } 
   else {
@@ -72,7 +72,7 @@ export const exprBp = (lexer: Lexer, minBp: number = 0): S => {
       lexer.next(); // Consume the operator
 
       if (op === '[') {
-        const rhs = exprBp(lexer, 0);
+        const rhs = parseExpression(lexer, 0);
         const closeParen = lexer.next();
         if (closeParen.type !== 'Op' || closeParen.value !== ']') throw new SyntaxError("Expected ']'");
         lhs = { type: 'Cons', head: op, rest: [lhs, rhs] };
@@ -83,19 +83,19 @@ export const exprBp = (lexer: Lexer, minBp: number = 0): S => {
     }
 
     // 2. Handle Infix Operators (e.g., '+', '?', '.')
-    const infix = getInfixBP(op);
-    if (infix) {
-      if (infix.left < minBp) break;
+    const bp = getInfixBP(op);
+    if (bp) {
+      if (bp.left < minBp) break;
       lexer.next(); // Consume the operator
 
       if (op === '?') { // Ternary Operator handling
-        const mhs = exprBp(lexer, 0);
+        const mhs = parseExpression(lexer, 0);
         const closeParen = lexer.next();
         if (closeParen.type !== 'Op' || closeParen.value !== ':') throw new SyntaxError("Expected ':'");
-        const rhs = exprBp(lexer, infix.right);
+        const rhs = parseExpression(lexer, bp.right);
         lhs = { type: 'Cons', head: op, rest: [lhs, mhs, rhs] };
       } else {
-        const rhs = exprBp(lexer, infix.right);
+        const rhs = parseExpression(lexer, bp.right);
         lhs = { type: 'Cons', head: op, rest: [lhs, rhs] };
       }
       continue;

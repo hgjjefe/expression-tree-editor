@@ -1,7 +1,8 @@
 import { Node, setCoordinates, drawTree, constructTree } from './tree'
+import { convertSToTree } from './tree-nary';
 import { infixToPostfix } from './infixToPostfix';
 import Swal from 'sweetalert2';
-import { exprBp, formatS  } from './parser'
+import { parseExpression, formatS, type S  } from './parser'
 import { Lexer } from './lexer';
 
 (function () {
@@ -45,8 +46,12 @@ import { Lexer } from './lexer';
     }
     document.getElementById('generate-tree')!.addEventListener('click', () => {
         let expression = expressionInput.value
-        generateS(expression);
         if (typeof expression !== 'undefined' && null != expression) {
+            let s_expr = generateS(expression);
+            printS(s_expr);
+            let tree = convertSToTree(s_expr);
+            
+
             expression = expression.replace(/\s+/g, '')
             expression = expression.toLowerCase()
             let postfix = infixToPostfix(expression);
@@ -85,8 +90,10 @@ import { Lexer } from './lexer';
 
 function generateS(input: string){
     let lexer = new Lexer(input);
-    let s = exprBp(lexer, 0);
-    console.log(formatS(s));
+    return parseExpression(lexer, 0);
+}
+function printS(s: S){
+    console.log("S:", formatS(s));
 }
 
 

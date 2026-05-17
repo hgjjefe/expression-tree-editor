@@ -139,3 +139,5 @@ function drawTree(root: Node, context: CanvasRenderingContext2D) {
 }
 
 export { Node, setCoordinates, drawTree, constructTree };
+
+
