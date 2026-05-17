@@ -1,6 +1,8 @@
 import { Node, setCoordinates, drawTree, constructTree } from './tree'
 import { infixToPostfix } from './infixToPostfix';
 import Swal from 'sweetalert2';
+import { exprBp, formatS  } from './parser'
+import { Lexer } from './lexer';
 
 (function () {
     const SAMPLE_EXPRESSIONS = [
@@ -43,6 +45,7 @@ import Swal from 'sweetalert2';
     }
     document.getElementById('generate-tree')!.addEventListener('click', () => {
         let expression = expressionInput.value
+        generateS(expression);
         if (typeof expression !== 'undefined' && null != expression) {
             expression = expression.replace(/\s+/g, '')
             expression = expression.toLowerCase()
@@ -79,6 +82,12 @@ import Swal from 'sweetalert2';
     }, 500)
 })();
 
+
+function generateS(input: string){
+    let lexer = new Lexer(input);
+    let s = exprBp(lexer, 0);
+    console.log(formatS(s));
+}
 
 
 function displayErrorMessage() {
