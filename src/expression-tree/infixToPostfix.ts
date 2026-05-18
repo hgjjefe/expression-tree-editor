@@ -25,7 +25,7 @@ function isValidExpression(expr: string) {
     return false;
   }
   for (let i = 0; i < expr.length; i++) {
-    if ('abcdefghijklmnopqrstuvwxyz*()/+-'.indexOf(expr[i]) === -1) {
+    if ('abcdefghijklmnopqrstuvwxyz*()/+-0123456789'.indexOf(expr[i]) === -1) {
       return false;
     }
   }
@@ -55,7 +55,7 @@ export function infixToPostfix(expression: string): string[] | null {
   let postfixList = []
   let tokens = expression.split('')
   for (const token of tokens) {
-    if ("abcdefghijklmnopqrstuvwxyz".indexOf(token) !== -1) {
+    if ("abcdefghijklmnopqrstuvwxyz0123456789".indexOf(token) !== -1) {
       postfixList.push(token)
     } else if ("(" === token) {
       op_stack.push(token)

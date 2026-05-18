@@ -56,7 +56,7 @@ class Node {
 // type: String[] -> Node
 function constructTree(postfix: string[]) {
     const OPERATORS = ['*', '/', '-', '+'];
-    let stack = [];
+    let stack: string[] = [];
     let root: Node | null = null;
     let current;
     let shift = false;

@@ -2,7 +2,7 @@ import { Node, setCoordinates, drawTree, constructTree } from './tree'
 import { convertSToTree, renderPipeline } from './tree-nary';
 import { infixToPostfix } from './infixToPostfix';
 import Swal from 'sweetalert2';
-import { parseExpression, formatS, type S  } from './parser'
+import { parseExpression, formatS, type SExpression  } from './parser'
 import { Lexer } from './lexer';
 
 const canvas = document.querySelector('canvas') as HTMLCanvasElement;
@@ -16,7 +16,7 @@ function generateNaryTree(){
         try {
             let s_expr = generateS(expression);
             printS(s_expr);
-            renderPipeline(expression, ctx)
+            renderPipeline(expression, ctx);
         } catch (e) {
             displayErrorMessageNary()
             console.log(e)
@@ -28,8 +28,18 @@ function randomizeExpression(){
     generateNaryTree()
 }
 
-function convertToNormalForm(){
-    
+function canonicalizeTree(){
+    let expression = expressionInput.value
+    if (typeof expression !== 'undefined' && null != expression) {
+        try {
+            let s_expr = generateS(expression);
+            printS(s_expr);
+            renderPipeline(expression, ctx, true);
+        } catch (e) {
+            displayErrorMessageNary()
+            console.log(e)
+        }
+    }
 }
 
 const SAMPLE_EXPRESSIONS = [
@@ -50,6 +60,9 @@ const SAMPLE_EXPRESSIONS2 = [
     "x[0][1]"
 ]
 
+function clearCanvas() { 
+    ctx.clearRect(0, 0, canvas.width, canvas.height) }
+
 function init() {
 
     
@@ -62,8 +75,7 @@ function init() {
         return
     }
     let currentRoot : Node | null = null;
-    function clearCanvas() { 
-        ctx.clearRect(0, 0, canvas.width, canvas.height) }
+
 
     function render() {
         // 1. Resize the canvas to match its HTML container layout
@@ -120,6 +132,7 @@ function init() {
         clearCanvas()
     })
     document.getElementById('randomize')!.addEventListener('click', randomizeExpression);
+    document.getElementById('canonicalize')!.addEventListener('click', canonicalizeTree);
     window.addEventListener('resize', render);
 
     expressionInput.value = SAMPLE_EXPRESSIONS[Math.floor(Math.random() * SAMPLE_EXPRESSIONS.length)]
@@ -134,7 +147,7 @@ function generateS(input: string){
     let lexer = new Lexer(input);
     return parseExpression(lexer, 0);
 }
-function printS(s: S){
+function printS(s: SExpression){
     console.log("S:", formatS(s));
 }
 

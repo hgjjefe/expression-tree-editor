@@ -3,20 +3,12 @@ https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html */
 import { Lexer, type Token } from './lexer';
 import { getInfixBP, getPrefixBP, getPostfixBP } from './binding-powers';
 
-// Temporary data structure for testing
-export interface Atom {
-  type: 'Atom';
-  value: string;
-}
-export interface Cons {
-  type: 'Cons';
-  head: string;
-  rest: S[];
-}
+// N-ary tree data structure to hold expressions
+export type SExpression =
+    | { type: 'Atom'; value: string }
+    | { type: 'Cons'; value: string; rest: SExpression[] };
 
-export type S = Atom | Cons;
-
-export function formatS(node: S): string {
+export function formatS(node: SExpression): string {
   switch (node.type) {
     case 'Atom':
       return node.value;
@@ -26,16 +18,16 @@ export function formatS(node: S): string {
       const formattedRest = node.rest.map(formatS).join(' ');
       // If there are sub-nodes, add a space before them
       const space = formattedRest ? ' ' : '';
-      return `(${node.head}${space}${formattedRest})`;
+      return `(${node.value}${space}${formattedRest})`;
     }
   }
 }
 
 
 // 2. The Core Pratt Parser Loop
-export const parseExpression = (lexer: Lexer, minBp: number = 0): S => {
+export const parseExpression = (lexer: Lexer, minBp: number = 0): SExpression => {
   const token = lexer.next();
-  let lhs: S;
+  let lhs: SExpression;
   // --- PREFIX / ATOM PHASE ---
   if (token.type === 'Atom') {
     lhs = { type: 'Atom', value: token.value };
@@ -50,7 +42,7 @@ export const parseExpression = (lexer: Lexer, minBp: number = 0): S => {
     if (prefixBP=== null) throw new SyntaxError(`Bad prefix token: ${token.value}`);
     
     const rhs = parseExpression(lexer, prefixBP);
-    lhs = { type: 'Cons', head: token.value, rest: [rhs] };
+    lhs = { type: 'Cons', value: token.value, rest: [rhs] };
   } 
   else {
     throw new SyntaxError("Unexpected token block");
@@ -73,9 +65,9 @@ export const parseExpression = (lexer: Lexer, minBp: number = 0): S => {
         const rhs = parseExpression(lexer, 0);
         const closeParen = lexer.next();
         if (closeParen.type !== 'Op' || closeParen.value !== ']') throw new SyntaxError("Expected ']'");
-        lhs = { type: 'Cons', head: op, rest: [lhs, rhs] };
+        lhs = { type: 'Cons', value: op, rest: [lhs, rhs] };
       } else {
-        lhs = { type: 'Cons', head: op, rest: [lhs] };
+        lhs = { type: 'Cons', value: op, rest: [lhs] };
       }
       continue;
     }
@@ -93,10 +85,10 @@ export const parseExpression = (lexer: Lexer, minBp: number = 0): S => {
         const closeParen = lexer.next();
         if (closeParen.type !== 'Op' || closeParen.value !== ':') throw new SyntaxError("Expected ':'");
         const rhs = parseExpression(lexer, r_bp);
-        lhs = { type: 'Cons', head: op, rest: [lhs, mhs, rhs] };
+        lhs = { type: 'Cons', value: op, rest: [lhs, mhs, rhs] };
       } else {
         const rhs = parseExpression(lexer, r_bp);
-        lhs = { type: 'Cons', head: op, rest: [lhs, rhs] };
+        lhs = { type: 'Cons', value: op, rest: [lhs, rhs] };
       }
       continue;
     }
