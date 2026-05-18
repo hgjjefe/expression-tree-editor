@@ -136,6 +136,7 @@ function init() {
     window.addEventListener('resize', render);
 
     expressionInput.value = SAMPLE_EXPRESSIONS[Math.floor(Math.random() * SAMPLE_EXPRESSIONS.length)]
+    expressionInput.value = 'a+(b+c+d)'
     setTimeout(() => {
         document.getElementById('generate-tree')!.click()
     }, 500)

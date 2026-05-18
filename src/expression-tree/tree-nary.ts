@@ -1,4 +1,4 @@
-import { parseExpression, type SExpression } from './parser';
+import { parseExpression, type SExpression, PAREN, formatS } from './parser';
 import { Lexer } from './lexer'
 
 /* NEW VERSION FOR SExpression EXPRESSIONS (N-ARY TREE) */
@@ -10,7 +10,6 @@ export class TreeNode {
   value: string;
   x: number | null = null;
   y: number | null = null;
-  //depth : number | null = null;
   children: TreeNode[] = [];
 
   constructor(value: string) {
@@ -65,7 +64,7 @@ export class TreeNode {
     context.lineWidth = 1;
     context.stroke();
 
-    context.font = '20px Times New Roman';
+    context.font = '24px Times New Roman';
     context.textAlign = 'center';
     context.textBaseline = 'middle';
     context.fillStyle = "#212121";
@@ -88,38 +87,71 @@ export function convertSToTree(sNode: SExpression): TreeNode {
 
 // Canonicalize expression by flattening consecutive left '+'s
 export function canonicalize(sNode: SExpression): SExpression {
-    if (sNode.type === 'Atom'){
+    if (sNode.type === 'Atom' || sNode.rest.length === 0){
         return sNode;   // Don't change if Atom
     }
-    const op = sNode.value;
+    let op = sNode.value;
+    // Discard right PAREN () if any
 
-    // 1. Process the right branch first. 
-    // This is on the right diagonal, so we treat it as an isolated sub-expression (parenthesis shield).
-    const processedRight = canonicalize(sNode.rest[1]);
+    if (sNode.type === 'Cons' && sNode.rest.length > 1 && sNode.rest[1].value === PAREN){
+        sNode.rest[1] = sNode.rest[1].rest[0];
+    }
+    //console.log("snode", formatS(sNode))
+    //console.log("left", formatS(sNode.rest[0]), ", right:", formatS(sNode.rest[1]))
+    let processedLeft = canonicalize(sNode.rest[0]);
+    // If unary operator then no right so return already
+    if (sNode.rest[1] === undefined){
+        return { type: 'Cons', value: op, rest: [processedLeft] };
+    }
+    let processedRight = canonicalize(sNode.rest[1]);
 
-    // 2. Process the left branch.
-    const processedLeft = canonicalize(sNode.rest[0]);
+    // Cononicalize (- A B) into (+ A (-B))
+    if (op === '-'){
+        sNode = {
+            type: 'Cons',
+            value: '+',
+            rest: [ processedLeft, { type: 'Cons', value: '-', rest: [ processedRight! ]} ]
+        };
+        processedRight = sNode.rest[1];
+    } else if (op === '/'){  // Cononicalize (/ A B) into (* A (inv B))
+        sNode = {
+            type: 'Cons',
+            value: '*',
+            rest: [ processedLeft, { type: 'Cons', value: 'inv', rest: [  processedRight! ]} ]
+        };
+        processedRight = sNode.rest[1];
+    }  
+    op = sNode.value;   // Update op as sNode is updated
 
-    // 3. Check if the operator is associative/commutative and matches its left child
-    if ((op === '+' || op === '*') && processedLeft.type === 'Cons' && processedLeft.value === op) {
-        // COLLAPSE LOGIC: Merge the left child's children array with the right child.
-        // This dissolves the binary node on the left but keeps the right side grouped!
+    // Flatten (+ (+ A B) C) => (+ A B C)
+    if ((op === '+') && processedLeft.type === 'Cons' && processedLeft.value === '+') {
+        const result = {
+            type: 'Cons',
+            value: op,
+            rest: [...processedLeft.rest, processedRight! ] } satisfies SExpression;
+        return result;
+    } else if ((op === '*') && processedLeft.type === 'Cons' && processedLeft.value === '*') {
         return {
             type: 'Cons',
             value: op,
-            rest: [...processedLeft.rest, processedRight]
-        };
+            rest: [...processedLeft.rest, processedRight! ] } ;
     }
+    // Discard left PAREN () if any
+    if (processedLeft.type === 'Cons' && processedLeft.value === PAREN){
+        processedLeft = processedLeft.rest[0]
+    }
+    
+    // Don't change for other operators
+    console.log("Natural return")
 
-    // 4. Default case: If it doesn't match or is a right-associative/non-commutative operator (-, /, ^)
-    // We create a standard N-ary node with just its direct two processed children.
+
     return {
         type: 'Cons',
         value: op,
-        rest: [processedLeft, processedRight]
+        rest: [ processedLeft, processedRight ]
     };
 }
-
+//a+b-(c+d)-e/(a*d)+(a-(c*d))
 
 
 const LEVEL_HEIGHT = 80; // Vertical distance between parent and child lines
@@ -136,13 +168,13 @@ export function calculateTreeLayout(root: TreeNode, canvasWidth: number, startTo
     if (node.isLeaf()) {
       node.x = currentX;
       currentX += LEAF_SPACING; // Move the anchor right for the next leaf
+      return; 
     } 
     // 3. Recursive Case: Layout all children first, then center the parent
     else {
       for (const child of node.children) {
         traverse(child, depth + 1);
       }
-
       // Center this parent perfectly between its first and last child
       const firstChildX = node.children[0].x!;
       const lastChildX = node.children[node.children.length - 1].x!;

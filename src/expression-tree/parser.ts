@@ -14,6 +14,9 @@ export function formatS(node: SExpression): string {
       return node.value;
 
     case 'Cons': {
+      if (node.value === PAREN){
+         //return formatS(node.rest[0]);  // Ignore PAREN in printing
+      }
       // Recursively format every sub-node in the array
       const formattedRest = node.rest.map(formatS).join(' ');
       // If there are sub-nodes, add a space before them
@@ -22,7 +25,8 @@ export function formatS(node: SExpression): string {
     }
   }
 }
-
+ // Virtual operator for parenthesis to distinguish a+b+c and (a+b)+c
+export const PAREN = '( )';
 
 // 2. The Core Pratt Parser Loop
 export const parseExpression = (lexer: Lexer, minBp: number = 0): SExpression => {
@@ -36,6 +40,7 @@ export const parseExpression = (lexer: Lexer, minBp: number = 0): SExpression =>
     lhs = parseExpression(lexer, 0);
     const closeParen = lexer.next();
     if (closeParen.type !== 'Op' || closeParen.value !== ')') throw new SyntaxError("Expected ')'");
+    lhs = { type: 'Cons', value: PAREN, rest: [lhs] }
   } 
   else if (token.type === 'Op') {
     const prefixBP = getPrefixBP(token.value);
