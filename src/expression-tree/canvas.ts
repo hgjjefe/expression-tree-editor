@@ -4,10 +4,12 @@ import { infixToPostfix } from './infixToPostfix';
 import Swal from 'sweetalert2';
 import { parseExpression, formatS, type SExpression  } from './parser'
 import { Lexer } from './lexer';
+import { displayS } from './math-display';
 
 const canvas = document.querySelector('canvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
 const expressionInput = document.getElementById('expression-input') as HTMLInputElement;
+const mathDisplay = document.getElementById('math-display');
 
 // Button functions
 function generateNaryTree(){
@@ -17,9 +19,15 @@ function generateNaryTree(){
             let s_expr = generateS(expression);
             printS(s_expr);
             renderPipeline(expression, ctx);
-        } catch (e) {
-            displayErrorMessageNary()
-            console.log(e)
+        } catch (error) {
+            if (error instanceof SyntaxError){
+                const errorMessage: string = error.message;
+                displayErrorMessageNary(errorMessage);
+                console.log(error)
+            } else{
+                displayErrorMessageNary();
+            }
+
         }
     }
 }
@@ -34,10 +42,21 @@ function canonicalizeTree(){
         try {
             let s_expr = generateS(expression);
             printS(s_expr);
-            renderPipeline(expression, ctx, true);
-        } catch (e) {
-            displayErrorMessageNary()
-            console.log(e)
+            s_expr =  renderPipeline(expression, ctx, true);
+            console.log('s_expr', s_expr)
+            mathDisplay!.textContent = displayS(s_expr);
+            if ((window as any).MathJax) {
+                (window as any).MathJax.typesetPromise([mathDisplay])
+                    .catch((err: any) => console.log('MathJax typeset failed: ', err));
+            }
+        } catch (error) {
+            if (error instanceof SyntaxError){
+                const errorMessage: string = error.message;
+                displayErrorMessageNary(errorMessage);
+                console.log(error)
+            } else{
+                displayErrorMessageNary();
+            }
         }
     }
 }
@@ -172,17 +191,21 @@ function displayErrorMessage() {
     })
 }
 
-function displayErrorMessageNary() {
+function displayErrorMessageNary(message: string | undefined = undefined ) {
+    if (message === undefined){
+        message = 
+            `You have some syntax error but I won\'t tell you why. <br/>
+            - Good luck trying to figure it out. <br/>`
+    }
     Swal.fire({
         icon: 'error',
         title: 'Syntax Error!',
         html: `
             <div style="font-size:1.1em;text-align: left;margin:0px 0px 0px 60px;">
-                - You have some syntax error but i wont tell you why. <br/>
-                - Good luck trying to figure it out. <br/>
+                - ${message} <br/>
                 - Valid operators and operands are:<br/>
                 <div style="margin-left: 10px;">
-                    <i>Operators</i>: <b>[+ - * / ^ ]</b><br/>
+                    <i>Operators</i>: <b>[+ - * / ^ ! . =]</b><br/>
                     <i>Operands</i>: Any alphanumeric single letter.
                 </div>
             </div>

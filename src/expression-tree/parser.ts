@@ -58,7 +58,7 @@ export const parseExpression = (lexer: Lexer, minBp: number = 0): SExpression =>
   while (true) {
     const nextToken = lexer.peek();
     if (nextToken.type === 'Eof') break;
-    if (nextToken.type !== 'Op') throw new SyntaxError("Expected operator");
+    if (nextToken.type !== 'Op') throw new SyntaxError(`Expected operator instead of '${nextToken.value}'`);
     const op = nextToken.value;
 
     // 1. Handle Postfix Operators (e.g., '!', '[')

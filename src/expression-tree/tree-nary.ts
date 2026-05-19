@@ -146,11 +146,7 @@ export function canonicalize(sNode: SExpression): SExpression {
     if (processedLeft.type === 'Cons' && processedLeft.value === PAREN){
         processedLeft = processedLeft.rest[0]
     }
-    
     // Don't change for other operators
-    console.log("Natural return")
-
-
     return {
         type: 'Cons',
         value: op,
@@ -249,4 +245,6 @@ export function renderPipeline(rawInput: string, ctx: CanvasRenderingContext2D, 
 
   // 4. Fire the paint loops onto the canvas context
   drawTree(ctx, visualRoot);
+
+  return sExpression;
 }

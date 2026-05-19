@@ -20,9 +20,11 @@ export class Lexer {
             // Check for Atoms (Alphanumeric characters: 0-9, a-z, A-Z)
             if (/[0-9a-zA-Z]/.test(char)) {
                 tokens.push({ type: 'Atom', value: char });
-            } else {
+            } else if ('+-*/^!()=.'.indexOf(char) !== -1) {
                 // Everything else is treated as an Operator
                 tokens.push({ type: 'Op', value: char });
+            } else {
+                throw new SyntaxError(`Illegal token: '${char}'`);
             }
         }
         // Reverse the array for highly efficient O(1) popping
