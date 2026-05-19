@@ -1,7 +1,7 @@
-import { Node, setCoordinates, drawTree, constructTree } from './tree'
-import { convertSToTree, renderPipeline } from './tree-nary';
-import { infixToPostfix } from './infixToPostfix';
+import { generateTreeOld } from './old/utils';
 import Swal from 'sweetalert2';
+
+import { convertSToTree, calculateTreeLayout, canonicalize, TreeNode, drawTree } from './tree-nary';
 import { parseExpression, formatS, type SExpression  } from './parser'
 import { Lexer } from './lexer';
 import { displayS } from './math-display';
@@ -10,6 +10,30 @@ const canvas = document.querySelector('canvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
 const expressionInput = document.getElementById('expression-input') as HTMLInputElement;
 const mathDisplay = document.getElementById('math-display');
+
+
+
+function clearCanvas() { 
+    ctx.clearRect(0, 0, canvas.width, canvas.height) }
+
+        
+function renderPipeline(rawInput: string, ctx: CanvasRenderingContext2D, isCanonicalize: boolean = false) {
+  // Clear the canvas window for a fresh frame
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  // 1. Parse the string into an SExpression-Expression Tree
+  let sExpression = parseExpression(new Lexer(rawInput), 0);
+  if (isCanonicalize){
+    sExpression = canonicalize(sExpression);
+  }
+  // 2. Convert pure data nodes into drawable layout nodes
+  const visualRoot = convertSToTree(sExpression);
+  // 3. Mutate the visual tree to append all x and y positions
+  calculateTreeLayout(visualRoot, ctx.canvas.width, 60);
+  // 4. Fire the paint loops onto the canvas context
+  drawTree(ctx, visualRoot);
+  return sExpression;
+}
+
 
 // Button functions
 function generateNaryTree(){
@@ -22,10 +46,10 @@ function generateNaryTree(){
         } catch (error) {
             if (error instanceof SyntaxError){
                 const errorMessage: string = error.message;
-                displayErrorMessageNary(errorMessage);
+                displayErrorMessage(errorMessage);
                 console.log(error)
             } else{
-                displayErrorMessageNary();
+                displayErrorMessage();
             }
 
         }
@@ -52,14 +76,15 @@ function canonicalizeTree(){
         } catch (error) {
             if (error instanceof SyntaxError){
                 const errorMessage: string = error.message;
-                displayErrorMessageNary(errorMessage);
+                displayErrorMessage(errorMessage);
                 console.log(error)
             } else{
-                displayErrorMessageNary();
+                displayErrorMessage();
             }
         }
     }
 }
+
 
 const SAMPLE_EXPRESSIONS = [
     '(a + b)*c - (x - y)/z',
@@ -76,15 +101,11 @@ const SAMPLE_EXPRESSIONS2 = [
     " 1 + 2 + f . g . h * 3 * 4",
     "--1 * 2",
     "(((0)))",
-    "x[0][1]"
+    "x^y^(z*a+d)"
 ]
-
-function clearCanvas() { 
-    ctx.clearRect(0, 0, canvas.width, canvas.height) }
 
 function init() {
 
-    
     if (!canvas) {
         console.error("Could not find the canvas element in the DOM!");
         return;
@@ -93,57 +114,17 @@ function init() {
         console.error("Canvas Context is missing!");
         return
     }
-    let currentRoot : Node | null = null;
+    let currentVisualRoot : TreeNode | null = null;
 
-
-    function render() {
-        // 1. Resize the canvas to match its HTML container layout
+   function render() {
         const container = document.getElementById('canvas-container');
-        if (!container){
-            console.log("Container is missing!");
-            return;
-        }
+        if (!container) return;
         canvas.height = container.offsetHeight;
         canvas.width = container.offsetWidth;
-        clearCanvas();
-        if (currentRoot) {
-            setCoordinates(currentRoot);
-            drawTree(currentRoot, ctx);
-        }
+        generateTreeOld(ctx, expressionInput.value);
     }
-    document.getElementById('generate-tree')!.addEventListener('click', () => {
-        let expression = expressionInput.value
-        if (typeof expression !== 'undefined' && null != expression) {
-            try {
-                let s_expr = generateS(expression);
-                printS(s_expr);
-                let tree = convertSToTree(s_expr);
-            } catch (e) {
-                console.log(e)
-            }
-            
-            expression = expression.replace(/\s+/g, '')
-            expression = expression.toLowerCase()
-            let postfix = infixToPostfix(expression);
-            if (null !== postfix) {
-                try {
-                    currentRoot = constructTree(postfix) as Node
-                    setCoordinates(currentRoot)
-                    clearCanvas()
-                    canvas.height = document.getElementById('canvas-container')!.offsetHeight;
-                    canvas.width = document.getElementById('canvas-container')!.offsetWidth;
-                    drawTree(currentRoot, ctx)
-                } catch (e) {
-                    displayErrorMessage()
-                }
-            } else {
-                displayErrorMessage()
-            }
-
-        } else {
-            displayErrorMessage()
-        }
-    })
+    // GENERATE TREE (OLD)
+    document.getElementById('generate-tree')!.addEventListener('click', ()=>{ generateTreeOld(ctx, expressionInput.value) })
     document.getElementById('generate-nary-tree')!.addEventListener('click', generateNaryTree);
 
     document.getElementById('clear-tree')!.addEventListener('click', () => {
@@ -172,26 +153,7 @@ function printS(s: SExpression){
 }
 
 
-function displayErrorMessage() {
-    Swal.fire({
-        icon: 'error',
-        title: 'Invalid expression',
-        html: `
-            <div style="font-size:1.1em;text-align: left;margin:0px 0px 0px 60px;">
-                - You may only use these brackets ( ). <br/>
-                - Use * for multiplication and / for division. <br/>
-                - Valid operators and operands are:<br/>
-                <div style="margin-left: 10px;">
-                    <i>Operators</i>: <b>[+ - * / ]</b><br/>
-                    <i>Operands</i>: Any alphabetic letter.
-                </div>
-            </div>
-        `,
-        footer: '<a href="https://github.com/lnogueir/expression-tree-gen">Learn more</a>'
-    })
-}
-
-function displayErrorMessageNary(message: string | undefined = undefined ) {
+function displayErrorMessage(message: string | undefined = undefined ) {
     if (message === undefined){
         message = 
             `You have some syntax error but I won\'t tell you why. <br/>

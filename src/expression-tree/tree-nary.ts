@@ -214,7 +214,6 @@ export function calculateTreeLayout(root: TreeNode, canvasWidth: number, startTo
 }
 
 
-
 export function drawTree(context: CanvasRenderingContext2D, node: TreeNode) {
   // 1. Pass down through the branches to draw lines and child nodes
   for (const child of node.children) {
@@ -226,25 +225,3 @@ export function drawTree(context: CanvasRenderingContext2D, node: TreeNode) {
   node.drawNode(context);
 }
 
-export function renderPipeline(rawInput: string, ctx: CanvasRenderingContext2D, isCanonicalize: boolean = false) {
-  // Clear the canvas window for a fresh frame
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-  // 1. Parse the string into an SExpression-Expression Tree
-  // e.g., Outputs: { type: 'Cons', head: '+', rest: [...] }
-  let sExpression= parseExpression(new Lexer(rawInput), 0);
-  if (isCanonicalize){
-    sExpression = canonicalize(sExpression);
-  }
-
-  // 2. Convert pure data nodes into drawable layout nodes
-  const visualRoot = convertSToTree(sExpression);
-
-  // 3. Mutate the visual tree to append all x and y positions
-  calculateTreeLayout(visualRoot, ctx.canvas.width, 60);
-
-  // 4. Fire the paint loops onto the canvas context
-  drawTree(ctx, visualRoot);
-
-  return sExpression;
-}

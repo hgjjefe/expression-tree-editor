@@ -122,22 +122,22 @@ function setCoordinates(root: Node) {
     setCoordinates(root, 0);
 }
 
-function drawTree(root: Node, context: CanvasRenderingContext2D) {
+function drawTreeOld(root: Node, context: CanvasRenderingContext2D) {
     if (null != root) {
         root.drawNode(context);
         
         if (null != root.left) {
             root.drawEdge(context, root.left.x!, root.left.y!, true);
-            drawTree(root.left, context);
+            drawTreeOld(root.left, context);
         }
         
         if (null != root.right) {
             root.drawEdge(context, root.right.x!, root.right.y!, false);
-            drawTree(root.right, context);
+            drawTreeOld(root.right, context);
         }
     }
 }
 
-export { Node, setCoordinates, drawTree, constructTree };
+export { Node, setCoordinates, drawTreeOld, constructTree };
 
 
