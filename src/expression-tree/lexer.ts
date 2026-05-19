@@ -39,4 +39,8 @@ export class Lexer {
   public peek(): Token {
     return this.tokens.at(-1) ?? { type: 'Eof' };
   }
+
+  public getTokens(): Token[]{  // Getter method for getting tokens list
+     return this.tokens;
+  }
 }

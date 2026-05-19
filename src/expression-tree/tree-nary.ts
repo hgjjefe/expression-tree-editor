@@ -92,15 +92,21 @@ export function canonicalize(sNode: SExpression): SExpression {
     }
     let op = sNode.value;
     // Discard right PAREN () if any
-
-    if (sNode.type === 'Cons' && sNode.rest.length > 1 && sNode.rest[1].value === PAREN){
-        sNode.rest[1] = sNode.rest[1].rest[0];
+    if (sNode.type === 'Cons' && sNode.rest.length > 1) {
+        const rightChild = sNode.rest[1];
+        if (rightChild.type === 'Cons' && rightChild.value === PAREN) {
+            sNode.rest[1] = rightChild.rest[0];
+        }
     }
     //console.log("snode", formatS(sNode))
     //console.log("left", formatS(sNode.rest[0]), ", right:", formatS(sNode.rest[1]))
     let processedLeft = canonicalize(sNode.rest[0]);
     // If unary operator then no right so return already
     if (sNode.rest[1] === undefined){
+      // Discard left PAREN () if any
+        if (processedLeft.type === 'Cons' && processedLeft.value === PAREN){
+            processedLeft = processedLeft.rest[0]
+        }
         return { type: 'Cons', value: op, rest: [processedLeft] };
     }
     let processedRight = canonicalize(sNode.rest[1]);
@@ -151,7 +157,6 @@ export function canonicalize(sNode: SExpression): SExpression {
         rest: [ processedLeft, processedRight ]
     };
 }
-//a+b-(c+d)-e/(a*d)+(a-(c*d))
 
 
 const LEVEL_HEIGHT = 80; // Vertical distance between parent and child lines

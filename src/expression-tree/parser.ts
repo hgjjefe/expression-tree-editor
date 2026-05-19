@@ -40,7 +40,8 @@ export const parseExpression = (lexer: Lexer, minBp: number = 0): SExpression =>
     lhs = parseExpression(lexer, 0);
     const closeParen = lexer.next();
     if (closeParen.type !== 'Op' || closeParen.value !== ')') throw new SyntaxError("Expected ')'");
-    lhs = { type: 'Cons', value: PAREN, rest: [lhs] }
+    if ( lhs.value !== PAREN )  //  Don't add PAREN if op is already PAREN
+      lhs = { type: 'Cons', value: PAREN, rest: [lhs] }
   } 
   else if (token.type === 'Op') {
     const prefixBP = getPrefixBP(token.value);
@@ -100,8 +101,12 @@ export const parseExpression = (lexer: Lexer, minBp: number = 0): SExpression =>
 
     break;
   }
+  if (lexer.peek().type === 'Eof' ){ 
+    if (lhs.type !== 'Atom' && lhs.value === PAREN)  // Discard outermost paren that encloses whole expression
+      lhs = lhs.rest[0];
+  }
 
-  return lhs;
+  return lhs; 
 };
 
 
