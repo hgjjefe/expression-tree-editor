@@ -5,44 +5,53 @@ import { convertSToTree, calculateTreeLayout, canonicalize, TreeNode, drawTree }
 import { parseExpression, formatS, type SExpression  } from './parser'
 import { Lexer } from './lexer';
 import { displayS } from './math-display';
+import { exp } from 'mathjs';
 
 const canvas = document.querySelector('canvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
 const expressionInput = document.getElementById('expression-input') as HTMLInputElement;
 const mathDisplay = document.getElementById('math-display');
+let activeMode : 'old' | 'nary' = 'old';
+let currentRoot: TreeNode | null;
 
-
+function render() {
+    const container = document.getElementById('canvas-container');
+    if (!container) return;
+    canvas.height = container.offsetHeight;
+    canvas.width = container.offsetWidth;
+    clearCanvas()
+    if ( activeMode === 'old' ){
+        generateTreeOld(ctx, expressionInput.value);
+    } else if (activeMode === 'nary' && currentRoot) {
+        calculateTreeLayout(currentRoot, canvas.width, 60);
+        drawTree(ctx, currentRoot);
+    }
+}
 
 function clearCanvas() { 
     ctx.clearRect(0, 0, canvas.width, canvas.height) }
 
-        
-function renderPipeline(rawInput: string, ctx: CanvasRenderingContext2D, isCanonicalize: boolean = false) {
-  // Clear the canvas window for a fresh frame
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  // 1. Parse the string into an SExpression-Expression Tree
-  let sExpression = parseExpression(new Lexer(rawInput), 0);
-  if (isCanonicalize){
-    sExpression = canonicalize(sExpression);
-  }
-  // 2. Convert pure data nodes into drawable layout nodes
-  const visualRoot = convertSToTree(sExpression);
-  // 3. Mutate the visual tree to append all x and y positions
-  calculateTreeLayout(visualRoot, ctx.canvas.width, 60);
-  // 4. Fire the paint loops onto the canvas context
-  drawTree(ctx, visualRoot);
-  return sExpression;
-}
 
 
 // Button functions
-function generateNaryTree(){
+function generateTree(isCanonicalize = false){
+    activeMode = 'nary';
     let expression = expressionInput.value
     if (typeof expression !== 'undefined' && null != expression) {
         try {
-            let s_expr = generateS(expression);
-            printS(s_expr);
-            renderPipeline(expression, ctx);
+            let sExpression = parseExpression(new Lexer(expression), 0);
+            if (isCanonicalize){
+                sExpression = canonicalize(sExpression); 
+                mathDisplay!.textContent = displayS(sExpression);
+                if ((window as any).MathJax) {
+                    (window as any).MathJax.typesetPromise([mathDisplay])
+                        .catch((err: any) => console.log('MathJax typeset failed: ', err));
+                }
+            }
+            printS(sExpression); 
+            currentRoot = convertSToTree(sExpression);
+            render();
+            
         } catch (error) {
             if (error instanceof SyntaxError){
                 const errorMessage: string = error.message;
@@ -51,40 +60,13 @@ function generateNaryTree(){
             } else{
                 displayErrorMessage();
             }
-
         }
     }
 }
 function randomizeExpression(){
-    expressionInput.value = SAMPLE_EXPRESSIONS2[Math.floor(Math.random() * SAMPLE_EXPRESSIONS2.length)]
-    generateNaryTree()
+    expressionInput.value = SAMPLE_EXPRESSIONS[Math.floor(Math.random() * SAMPLE_EXPRESSIONS.length)]
+    generateTree()
 }
-
-function canonicalizeTree(){
-    let expression = expressionInput.value
-    if (typeof expression !== 'undefined' && null != expression) {
-        try {
-            let s_expr = generateS(expression);
-            printS(s_expr);
-            s_expr =  renderPipeline(expression, ctx, true);
-            console.log('s_expr', s_expr)
-            mathDisplay!.textContent = displayS(s_expr);
-            if ((window as any).MathJax) {
-                (window as any).MathJax.typesetPromise([mathDisplay])
-                    .catch((err: any) => console.log('MathJax typeset failed: ', err));
-            }
-        } catch (error) {
-            if (error instanceof SyntaxError){
-                const errorMessage: string = error.message;
-                displayErrorMessage(errorMessage);
-                console.log(error)
-            } else{
-                displayErrorMessage();
-            }
-        }
-    }
-}
-
 
 const SAMPLE_EXPRESSIONS = [
     '(a + b)*c - (x - y)/z',
@@ -92,10 +74,7 @@ const SAMPLE_EXPRESSIONS = [
     'x - y + (c / (a + b))',
     '(a / y) + b - (c * x)',
     '(a - b) * (c + d) / z',
-    '(a * b) - (x / y)'
-]
-
-const SAMPLE_EXPRESSIONS2 = [
+    '(a * b) - (x / y)',
     "a + b * c * d + e",
     "f . g . h",
     " 1 + 2 + f . g . h * 3 * 4",
@@ -108,37 +87,25 @@ function init() {
 
     if (!canvas) {
         console.error("Could not find the canvas element in the DOM!");
-        return;
-    }
+        return; }
     if (!ctx){
         console.error("Canvas Context is missing!");
-        return
-    }
-    let currentVisualRoot : TreeNode | null = null;
-
-   function render() {
-        const container = document.getElementById('canvas-container');
-        if (!container) return;
-        canvas.height = container.offsetHeight;
-        canvas.width = container.offsetWidth;
-        generateTreeOld(ctx, expressionInput.value);
-    }
+        return; }
+   
     // GENERATE TREE (OLD)
-    document.getElementById('generate-tree')!.addEventListener('click', ()=>{ generateTreeOld(ctx, expressionInput.value) })
-    document.getElementById('generate-nary-tree')!.addEventListener('click', generateNaryTree);
-
+    document.getElementById('generate-tree-old')!.addEventListener('click', ()=>{ activeMode = 'old'; generateTreeOld(ctx, expressionInput.value) })
+    document.getElementById('generate-tree')!.addEventListener('click', ()=> { generateTree(false) });
     document.getElementById('clear-tree')!.addEventListener('click', () => {
         expressionInput.value = ''
-        clearCanvas()
-    })
+        clearCanvas() })
     document.getElementById('randomize')!.addEventListener('click', randomizeExpression);
-    document.getElementById('canonicalize')!.addEventListener('click', canonicalizeTree);
+    document.getElementById('canonicalize')!.addEventListener('click', ()=> { generateTree(true) });
     window.addEventListener('resize', render);
 
     expressionInput.value = SAMPLE_EXPRESSIONS[Math.floor(Math.random() * SAMPLE_EXPRESSIONS.length)]
     expressionInput.value = 'a+(b+c+d)'
     setTimeout(() => {
-        document.getElementById('generate-tree')!.click()
+        document.getElementById('generate-tree-old')!.click()
     }, 500)
 };
 init();

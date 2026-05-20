@@ -2,28 +2,31 @@ import Swal from 'sweetalert2';
 import { infixToPostfix } from './infixToPostfix';
 import { constructTree, Node, setCoordinates, drawTreeOld } from './tree'; 
 
+let currentRoot: Node | null = null;
+
 export const generateTreeOld = (ctx: CanvasRenderingContext2D, expression:string) => {
 
-        if (typeof expression === 'undefined' || expression === null || expression.trim() === '') {
-            displayErrorMessage();
-            return; }
-        expression = expression.replace(/\s+/g, '').toLowerCase()
-        let postfix = infixToPostfix(expression);
-        if (postfix === null) {
-            displayErrorMessage();
-            return; }
-        try {
-            let currentRoot = constructTree(postfix) as Node
-            setCoordinates(currentRoot)
-            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-            const container = document.getElementById('canvas-container')!;
-            ctx.canvas.height = container.offsetHeight;
-            ctx.canvas.width = container.offsetWidth;
-            drawTreeOld(currentRoot, ctx)
-        } catch (e) {
-            displayErrorMessage()
-        }
+    if (typeof expression === 'undefined' || expression === null || expression.trim() === '') {
+        displayErrorMessage();
+        return; }
+    expression = expression.replace(/\s+/g, '').toLowerCase()
+    let postfix = infixToPostfix(expression);
+    if (postfix === null) {
+        displayErrorMessage();
+        return; }
+    try {
+        let currentRoot = constructTree(postfix) as Node
+        setCoordinates(currentRoot)
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        const container = document.getElementById('canvas-container')!;
+        ctx.canvas.height = container.offsetHeight;
+        ctx.canvas.width = container.offsetWidth;
+        drawTreeOld(currentRoot, ctx)
+        return currentRoot;
+    } catch (e) {
+        displayErrorMessage()
     }
+}
 
 function displayErrorMessage() {
     Swal.fire({
