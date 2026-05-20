@@ -10,6 +10,21 @@ export function displayS(sNode: SExpression): string {
         const op = sNode.value;
         if (sNode.rest.length > 1){   // More than one child means infix operator
             const parentBP = getInfixBP(op);
+            // SPECIAL LATEX EXPONENT HANDLING
+            if (op === '^') {
+                // Evaluate the base (left child)
+                let [baseStr, lOp, lFix] = displayHelper(sNode.rest[0])
+                // Evaluate the exponent tower (right child)
+                let [expStr, rOp, rFix] = displayHelper(sNode.rest[1])
+                // If the base itself is an infix operator (like a + b), it needs brackets: (a + b)^c
+                let lBp =  (lFix === 'in' ? getInfixBP(lOp!) : null)
+                if (lFix === 'in' && lBp !== null && lBp[0]! <= parentBP![0]!)
+                    baseStr = `(${baseStr})`
+                // Exponent side NEVER needs literal parentheses because the LaTeX braces {} 
+                // create the visual grouping boundary automatically!
+                return [`${baseStr}^{${expStr}}`, op, 'in']
+            }
+            // STANDARD INFIX HANDLING (For +, *, etc.)
             const result = sNode.rest.map( (s) => { 
                 let [sString, childOp, childFix] = displayHelper(s);
                 // Fallback wrap in brackets in case of some unknown op
