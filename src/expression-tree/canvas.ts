@@ -76,10 +76,10 @@ const SAMPLE_EXPRESSIONS = [
     '(a - b) * (c + d) / z',
     '(a * b) - (x / y)',
     "a + b * c * d + e",
-    "f . g . h",
-    " 1 + 2 + f . g . h * 3 * 4",
+    "f ^ g * h",
+    " 1 + 2 + f ^ (g * h) * 3 * 4",
     "--1 * 2",
-    "(((0)))",
+    "(a+b)^c+(e+f)/g",
     "x^y^(z*a+d)"
 ]
 

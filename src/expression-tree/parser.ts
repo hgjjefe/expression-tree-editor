@@ -140,34 +140,19 @@ export function canonicalize(sNode: SExpression): SExpression {
 
     // Cononicalize (- A B) into (+ A (-B))
     if (op === '-'){
-        sNode = {
-            type: 'Cons',
-            value: '+',
-            rest: [ processedLeft, { type: 'Cons', value: '-', rest: [ processedRight! ]} ]
-        };
-        processedRight = sNode.rest[1];
+        processedRight = { type: 'Cons', value: '-', rest: [ processedRight ] };
+        op = '+';
     } else if (op === '/'){  // Cononicalize (/ A B) into (* A (inv B))
-        sNode = {
-            type: 'Cons',
-            value: '*',
-            rest: [ processedLeft, { type: 'Cons', value: 'inv', rest: [  processedRight! ]} ]
-        };
-        processedRight = sNode.rest[1];
+        processedRight = { type: 'Cons', value: 'inv', rest: [ processedRight ] };
+        op = '*';
     }  
-    op = sNode.value;   // Update op as sNode is updated
-
-    // Flatten (+ (+ A B) C) => (+ A B C)
-    if ((op === '+') && processedLeft.type === 'Cons' && processedLeft.value === '+') {
+    // Flatten (+ (+ A B) C) => (+ A B C) and  (* (* A B) C) => (* A B C)
+    if (processedLeft.type === 'Cons' && processedLeft.value === op && (op ==='+'|| op ==='*')) {
         const result = {
             type: 'Cons',
             value: op,
             rest: [...processedLeft.rest, processedRight! ] } satisfies SExpression;
         return result;
-    } else if ((op === '*') && processedLeft.type === 'Cons' && processedLeft.value === '*') {
-        return {
-            type: 'Cons',
-            value: op,
-            rest: [...processedLeft.rest, processedRight! ] } ;
     }
     // Discard left PAREN () if any
     if (processedLeft.type === 'Cons' && processedLeft.value === PAREN){
