@@ -25,7 +25,7 @@ export function displayS(sNode: SExpression): string {
                 return [`${baseStr}^{${expStr}}`, op, 'in']
             }
             // STANDARD INFIX HANDLING (For +, *, etc.)
-            const result = sNode.rest.map( (s) => { 
+            let childStrings = sNode.rest.map( (s) => { 
                 let [sString, childOp, childFix] = displayHelper(s);
                 // Fallback wrap in brackets in case of some unknown op
                 if (parentBP === null) { return '(' + sString + ')'; }
@@ -44,8 +44,22 @@ export function displayS(sNode: SExpression): string {
                 if ( childBP[0] > parentBP[0] ){
                     return sString; }
                 return '(' + sString + ')';
-            } ).join(op);
-            return [ result, op, 'in'];
+            } );
+            // Merge any A * inv B into A/B using a stack method
+            if (op === '*'){
+                let stack: string[] = [];
+                for (let cStr of childStrings){
+                    if (stack.length === 0 || cStr.slice(0,3) !== 'inv' ){
+                        stack.push(cStr);
+                    }else{
+                        let numeratorStr =  stack.pop();
+                        stack.push( `\\frac{${numeratorStr}}{${cStr.slice(3)}}` );
+                    }
+                }
+                childStrings = stack;
+            }
+
+            return [ childStrings.join(op), op, 'in'];
         }
         // Unary operator
         let [sString, cOp, cFix] = displayHelper(sNode.rest[0]);
@@ -62,7 +76,7 @@ export function displayS(sNode: SExpression): string {
         else if (op === '√' ){
             return [ `\\sqrt{${sString}}`, op, 'pre']; }
         else if (op === 'inv' ){  //  a^(-1)
-            return [ `\\frac{1}{${sString}}`, op, 'pre']; }
+            return [ `inv ${sString}`, op, 'pre']; }
         else if (op === '!' ){  //  a^(-1)
             return [ `${sString}!`, op, 'post']; }
         // Other Prefix functions
