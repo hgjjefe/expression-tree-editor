@@ -39,8 +39,8 @@ export function displayS(sNode: SExpression): string {
             if (cFix === 'in'){
                 let cBp = getInfixBP(cOp);
                 if (cBp === null) return [`-(${sString})`, op, 'pre'];
-                if (cBp[0] > getPrefixBP('-')!)  return ['-' + sString, op, 'pre'];
-                [`-(${sString})`, op, 'pre'];
+                if (cBp[0] > getInfixBP('-')![0])  return ['-' + sString, op, 'pre'];
+                return [`-(${sString})`, op, 'pre'];
             }
             return ['-' + sString, op, 'pre'];
         }
