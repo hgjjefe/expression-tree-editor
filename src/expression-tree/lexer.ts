@@ -17,10 +17,19 @@ export class Lexer {
             if (/\s/.test(char)) {
                 continue;
             }
-            // Check for Atoms (Alphanumeric characters: 0-9, a-z, A-Z)
-            if (/[0-9a-zA-Z]/.test(char)) {
+            if (/[a-zA-Z]/.test(char)){
                 tokens.push({ type: 'Atom', value: char });
-            } else if ('+-*/^!()=√'.indexOf(char) !== -1) {
+            }
+            // Check for Atoms (Alphanumeric characters: 0-9, a-z, A-Z)
+            else if (/[0-9]/.test(char)) {
+                let value = '';
+                while (i < input.length && /[0-9]/.test(input[i])) {
+                    value += input[i];
+                    i++;  }
+                i--; 
+                tokens.push({ type: 'Atom', value: value });
+            }
+            else if ('+-*/^!()=√'.indexOf(char) !== -1) {
                 // Everything else is treated as an Operator
                 tokens.push({ type: 'Op', value: char });
             } else {
