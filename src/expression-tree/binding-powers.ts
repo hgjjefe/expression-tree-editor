@@ -1,3 +1,4 @@
+type InfixOp = '='
 
 // Dictionary for infix binding powers
 const INFIX_BINDING_POWERS: Record<string, [number, number]> = {
@@ -6,13 +7,15 @@ const INFIX_BINDING_POWERS: Record<string, [number, number]> = {
     '-': [5, 6],
     '*': [7, 8],
     '/': [7, 8],
-    '^': [12,11],
+    '^': [14,13],
     '.': [15,16],
 }
 
-const PREFIX_BINDING_POWERS: Record<string, number> = {
-    '+': 9,
+export const PREFIX_BINDING_POWERS: Record<string, number> = {
+    '+': 5,
     '-': 9,
+    '√': 11,
+    'inv': 13
 }
 
 const POSTFIX_BINDING_POWERS: Record<string, number> = {

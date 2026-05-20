@@ -48,6 +48,9 @@ export const parseExpression = (lexer: Lexer, minBp: number = 0): SExpression =>
     if (prefixBP=== null) throw new SyntaxError(`Bad prefix token: ${token.value}`);
     
     const rhs = parseExpression(lexer, prefixBP);
+    if (token.value === '+'){  // Discard prefix '+' for simplicity
+        lhs = rhs;
+    }else
     lhs = { type: 'Cons', value: token.value, rest: [rhs] };
   } 
   else {
@@ -108,5 +111,74 @@ export const parseExpression = (lexer: Lexer, minBp: number = 0): SExpression =>
 
   return lhs; 
 };
+
+// Canonicalize expression by flattening consecutive left '+'s
+export function canonicalize(sNode: SExpression): SExpression {
+    if (sNode.type === 'Atom' || sNode.rest.length === 0){
+        return sNode;   // Don't change if Atom
+    }
+    let op = sNode.value;
+    // Discard right PAREN () if any
+    if (sNode.type === 'Cons' && sNode.rest.length > 1) {
+        const rightChild = sNode.rest[1];
+        if (rightChild.type === 'Cons' && rightChild.value === PAREN) {
+            sNode.rest[1] = rightChild.rest[0];
+        }
+    }
+    //console.log("snode", formatS(sNode))
+    //console.log("left", formatS(sNode.rest[0]), ", right:", formatS(sNode.rest[1]))
+    let processedLeft = canonicalize(sNode.rest[0]);
+    // If unary operator then no right so return already
+    if (sNode.rest[1] === undefined){
+      // Discard left PAREN () if any
+        if (processedLeft.type === 'Cons' && processedLeft.value === PAREN){
+            processedLeft = processedLeft.rest[0]
+        }
+        return { type: 'Cons', value: op, rest: [processedLeft] };
+    }
+    let processedRight = canonicalize(sNode.rest[1]);
+
+    // Cononicalize (- A B) into (+ A (-B))
+    if (op === '-'){
+        sNode = {
+            type: 'Cons',
+            value: '+',
+            rest: [ processedLeft, { type: 'Cons', value: '-', rest: [ processedRight! ]} ]
+        };
+        processedRight = sNode.rest[1];
+    } else if (op === '/'){  // Cononicalize (/ A B) into (* A (inv B))
+        sNode = {
+            type: 'Cons',
+            value: '*',
+            rest: [ processedLeft, { type: 'Cons', value: 'inv', rest: [  processedRight! ]} ]
+        };
+        processedRight = sNode.rest[1];
+    }  
+    op = sNode.value;   // Update op as sNode is updated
+
+    // Flatten (+ (+ A B) C) => (+ A B C)
+    if ((op === '+') && processedLeft.type === 'Cons' && processedLeft.value === '+') {
+        const result = {
+            type: 'Cons',
+            value: op,
+            rest: [...processedLeft.rest, processedRight! ] } satisfies SExpression;
+        return result;
+    } else if ((op === '*') && processedLeft.type === 'Cons' && processedLeft.value === '*') {
+        return {
+            type: 'Cons',
+            value: op,
+            rest: [...processedLeft.rest, processedRight! ] } ;
+    }
+    // Discard left PAREN () if any
+    if (processedLeft.type === 'Cons' && processedLeft.value === PAREN){
+        processedLeft = processedLeft.rest[0]
+    }
+    // Don't change for other operators
+    return {
+        type: 'Cons',
+        value: op,
+        rest: [ processedLeft, processedRight ]
+    };
+}
 
 

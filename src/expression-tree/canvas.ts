@@ -1,8 +1,8 @@
 import { generateTreeOld } from './old/utils';
 import Swal from 'sweetalert2';
 
-import { convertSToTree, calculateTreeLayout, canonicalize, TreeNode, drawTree } from './tree-nary';
-import { parseExpression, formatS, type SExpression  } from './parser'
+import { convertSToTree, calculateTreeLayout, TreeNode, drawTree } from './tree';
+import { parseExpression, formatS, type SExpression, canonicalize  } from './parser'
 import { Lexer } from './lexer';
 import { displayS } from './math-display';
 import { exp } from 'mathjs';
@@ -105,30 +105,27 @@ function init() {
     expressionInput.value = SAMPLE_EXPRESSIONS[Math.floor(Math.random() * SAMPLE_EXPRESSIONS.length)]
     expressionInput.value = 'a+(b+c+d)'
     setTimeout(() => {
-        document.getElementById('generate-tree-old')!.click()
+        document.getElementById('generate-tree')!.click()
     }, 500)
 };
 init();
 
-
-function generateS(input: string){
-    let lexer = new Lexer(input);
-    return parseExpression(lexer, 0);
-}
 function printS(s: SExpression){
     console.log("S:", formatS(s));
 }
 
 
 function displayErrorMessage(message: string | undefined = undefined ) {
+    let errorTitle = 'Syntax Error!'
     if (message === undefined){
         message = 
-            `You have some syntax error but I won\'t tell you why. <br/>
+            `A fatal error occurred. <br/>
             - Good luck trying to figure it out. <br/>`
+        errorTitle = 'Fatal Error!'
     }
     Swal.fire({
         icon: 'error',
-        title: 'Syntax Error!',
+        title: errorTitle,
         html: `
             <div style="font-size:1.1em;text-align: left;margin:0px 0px 0px 60px;">
                 - ${message} <br/>
