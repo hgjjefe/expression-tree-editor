@@ -84,6 +84,6 @@ export function displayS(sNode: SExpression): string {
     }     
     let [result, _1, _2] = displayHelper(sNode);
     result = result.replaceAll('+-', '-');
-    console.log("res:", result)
+    console.log("display:", result)
     return '$$' + result + '$$';
 }

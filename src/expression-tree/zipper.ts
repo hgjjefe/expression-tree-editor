@@ -12,11 +12,13 @@ export class Zipper {
     public focus: SExpression;      // Current node
     public selected: Crumb | null;  // For passing cursor selected node to TreeNode
     public path: Crumb[];
+    public selectedPath: Crumb[];
     constructor(root: SExpression){
         this.root = root;
         this.focus = root;
         this.path = [];
         this.selected = null;
+        this.selectedPath = [];
     }
   // ==========================================
   // 1. GO DOWN: Step into a specific child
