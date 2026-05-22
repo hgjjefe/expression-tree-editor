@@ -40,6 +40,11 @@ function updateTree(newZipper = false){
     if (currentZipper === null || newZipper)
         currentZipper = new Zipper(currentSExpression!);
     currentRoot = convertSToTree(currentSExpression!, currentZipper);
+    mathDisplay!.textContent = displayS(currentSExpression!);
+                if ((window as any).MathJax) {
+                    (window as any).MathJax.typesetPromise([mathDisplay])
+                        .catch((err: any) => console.log('MathJax typeset failed: ', err));
+                } 
     render();
 }
 
@@ -53,11 +58,6 @@ function generateTree(isCanonicalize = false){
             // Canonicalize and update mathDisplay
             if (isCanonicalize){
                 currentSExpression = canonicalize(currentSExpression!);
-                mathDisplay!.textContent = displayS(currentSExpression!);
-                if ((window as any).MathJax) {
-                    (window as any).MathJax.typesetPromise([mathDisplay])
-                        .catch((err: any) => console.log('MathJax typeset failed: ', err));
-                } 
                 printS(currentSExpression!); 
             }
             updateTree(true);

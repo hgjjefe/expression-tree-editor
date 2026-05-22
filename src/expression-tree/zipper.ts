@@ -9,7 +9,7 @@ export interface Crumb {
 
 export class Zipper {
     public root: SExpression;
-    public focus: SExpression;
+    public focus: SExpression;      // Current node
     public selected: Crumb | null;  // For passing cursor selected node to TreeNode
     public path: Crumb[];
     constructor(root: SExpression){
@@ -23,10 +23,12 @@ export class Zipper {
   // ==========================================
     public goDown(targetIndex: number) {
         if (this.focus.type === 'Atom'){
-            console.log("Can't go down atom node"); return;
+            //console.log("Can't go down atom node"); 
+            return;
         } 
         if (targetIndex < 0 || targetIndex >= this.focus.rest.length) {
-           console.log("Child index out of bounds"); return;
+           //console.log("Child index out of bounds"); 
+           return;
         }
         const parentNode = this.focus;
         // Split the siblings around the target child
@@ -47,7 +49,8 @@ export class Zipper {
     // ==========================================
     public goUp() {
     if (this.path.length === 0) {
-        console.log("Already at the root node"); return;
+        //console.log("Already at the root node"); 
+        return;
     }
         // Pop the most recent history crumb off our stack
         const currentCrumb = this.path.pop()!;
@@ -58,16 +61,18 @@ export class Zipper {
     // ==========================================
     public goRight() {
         if (this.path.length === 0) {
-            console.log("Cannot move right at the root"); return;
+           // console.log("Cannot move right at the root"); 
+           return;
         }
         if (this.path.at(-1)!.rightSiblings.length === 0) {
-            console.log("Reached rightmost"); return;
+            //console.log("Reached rightmost"); 
+            return;
         }
         const currentCrumb = this.path.pop()!;
         // Make a shallow copy of currentCrumb
         let nextCrumb = {
             self : currentCrumb.self, parent: currentCrumb.parent,
-            leftSiblings: currentCrumb.leftSiblings, rightSiblings: currentCrumb.rightSiblings
+            leftSiblings: [...currentCrumb.leftSiblings], rightSiblings: [...currentCrumb.rightSiblings]
         } satisfies Crumb;
         // Pop the next sibling from the end of the right stack
         const nextFocus = nextCrumb!.rightSiblings.pop()!;
@@ -82,15 +87,17 @@ export class Zipper {
     // ==========================================
     public goLeft() {
         if (this.path.length === 0) {
-            console.log("Cannot move left at the root"); return;
+            //console.log("Cannot move left at the root"); 
+            return;
         }
         if (this.path.at(-1)!.leftSiblings.length === 0) {
-            console.log("Reached leftmost"); return;
+            //console.log("Reached leftmost"); 
+            return;
         }
         const currentCrumb = this.path.pop()!;
         let nextCrumb = {
             self : currentCrumb.self, parent: currentCrumb.parent,
-            leftSiblings: currentCrumb.leftSiblings, rightSiblings: currentCrumb.rightSiblings
+            leftSiblings: [...currentCrumb.leftSiblings], rightSiblings: [...currentCrumb.rightSiblings]
         } satisfies Crumb;
         // Pop the next sibling from the end of the left stack
         const nextFocus = nextCrumb!.leftSiblings.pop()!;

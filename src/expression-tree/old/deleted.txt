@@ -1,0 +1,20 @@
+        /*
+        [zipper.selected.self, zipper.focus] = [zipper.focus, zipper.selected.self]
+        zipper.path[-1] = {
+            self: zipper.focus,
+            parent: zipper.selected.parent,
+            leftSiblings: zipper.selected.parent.rest.slice(0, focusIndex),
+            rightSiblings: zipper.selected.parent.rest.slice(focusIndex + 1)
+        } satisfies Crumb;
+        // Fix Crumb siblings
+        zipper.focus = zipper.selected.self;
+        const parentNode = zipper.selected.parent;
+        // Split the siblings around the target child
+        
+
+        let selectedCrumb = zipper.selected
+        let focusCrumb = zipper.path.at(-1)!;
+        let [leftCrumb, rightCrumb ] = (selectedIndex <= focusIndex)? 
+                                   [selectedCrumb, focusCrumb] : [focusCrumb, selectedCrumb] ;
+        [ leftCrumb.leftSiblings.at(-1), rightCrumb.leftSiblings  ]
+        */
