@@ -1,6 +1,7 @@
 import { type SExpression } from "./parser";
 
-interface Crumb {
+export interface Crumb {
+    self: SExpression
     parent: SExpression
     leftSiblings: SExpression[]
     rightSiblings: SExpression[]
@@ -9,11 +10,13 @@ interface Crumb {
 export class Zipper {
     public root: SExpression;
     public focus: SExpression;
-    private path: Crumb[];
+    public selected: Crumb | null;  // For passing cursor selected node to TreeNode
+    public path: Crumb[];
     constructor(root: SExpression){
         this.root = root;
         this.focus = root;
         this.path = [];
+        this.selected = null;
     }
   // ==========================================
   // 1. GO DOWN: Step into a specific child
@@ -29,15 +32,15 @@ export class Zipper {
         // Split the siblings around the target child
         const lefts = parentNode.rest.slice(0, targetIndex);
         const rights = parentNode.rest.slice(targetIndex + 1).reverse(); // Reverse so the end is the next neighbor
-
+        // Move the focus down
+        this.focus = parentNode.rest[targetIndex];
         // Pack this context into a crumb and push it to our local history stack
         this.path.push({
+            self: this.focus,
             parent: parentNode,
             leftSiblings: lefts,
             rightSiblings: rights
         });
-        // Move the focus down
-        this.focus = parentNode.rest[targetIndex];
     }
     // ==========================================
     // 2. GO UP: Reconstruct the parent on the fly
@@ -56,16 +59,23 @@ export class Zipper {
     public goRight() {
         if (this.path.length === 0) {
             console.log("Cannot move right at the root"); return;
-    }
-        const currentCrumb = this.path.at(-1);
-        if (currentCrumb!.rightSiblings.length === 0) {
-            console.log("No more right siblings"); return;
         }
+        if (this.path.at(-1)!.rightSiblings.length === 0) {
+            console.log("Reached rightmost"); return;
+        }
+        const currentCrumb = this.path.pop()!;
+        // Make a shallow copy of currentCrumb
+        let nextCrumb = {
+            self : currentCrumb.self, parent: currentCrumb.parent,
+            leftSiblings: currentCrumb.leftSiblings, rightSiblings: currentCrumb.rightSiblings
+        } satisfies Crumb;
         // Pop the next sibling from the end of the right stack
-        const nextFocus = currentCrumb!.rightSiblings.pop()!;
+        const nextFocus = nextCrumb!.rightSiblings.pop()!;
         // Push our old focus onto the end of the left stack
-        currentCrumb!.leftSiblings.push(this.focus);
+        nextCrumb!.leftSiblings.push(this.focus);
         this.focus = nextFocus;
+        nextCrumb!.self = this.focus;
+        this.path.push(nextCrumb);
     }
     // ==========================================
     // 4. GO LEFT: Shift sideways using fast pop/push
@@ -74,14 +84,20 @@ export class Zipper {
         if (this.path.length === 0) {
             console.log("Cannot move left at the root"); return;
         }
-        const currentCrumb = this.path.at(-1);
-        if (currentCrumb!.leftSiblings.length === 0) {
-            console.log("No more left siblings"); return;
+        if (this.path.at(-1)!.leftSiblings.length === 0) {
+            console.log("Reached leftmost"); return;
         }
+        const currentCrumb = this.path.pop()!;
+        let nextCrumb = {
+            self : currentCrumb.self, parent: currentCrumb.parent,
+            leftSiblings: currentCrumb.leftSiblings, rightSiblings: currentCrumb.rightSiblings
+        } satisfies Crumb;
         // Pop the next sibling from the end of the left stack
-        const nextFocus = currentCrumb!.leftSiblings.pop()!;
+        const nextFocus = nextCrumb!.leftSiblings.pop()!;
         // Push our old focus onto the end of the right stack
-        currentCrumb!.rightSiblings.push(this.focus);
+        nextCrumb!.rightSiblings.push(this.focus);
         this.focus = nextFocus;
+        nextCrumb!.self = this.focus;
+        this.path.push(nextCrumb);
     }
 }

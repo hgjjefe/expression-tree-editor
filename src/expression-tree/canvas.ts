@@ -6,6 +6,7 @@ import { parseExpression, formatS, type SExpression, canonicalize  } from './par
 import { Lexer } from './lexer';
 import { displayS } from './math-display';
 import { Zipper } from './zipper';
+import { selectNode } from './cursor';
 import { exp } from 'mathjs';
 
 const canvas = document.querySelector('canvas') as HTMLCanvasElement;
@@ -119,6 +120,11 @@ function init() {
         if (currentRoot !== null){
             window.addEventListener('keydown', (event)=> {
                 if (currentZipper === null) return;
+                const target = event.target as HTMLElement;
+                if (    target.tagName === "INPUT" || 
+                        target.tagName === "TEXTAREA" || 
+                        target.isContentEditable
+                    ) { return; }
                 switch (event.key){
                     case "ArrowDown":
                         event.preventDefault();
@@ -132,6 +138,11 @@ function init() {
                     case "ArrowRight":
                         event.preventDefault();
                         currentZipper.goRight(); break;
+                }
+                switch (event.code){
+                    case "Space":   // Select a node
+                        event.preventDefault();
+                        selectNode(currentZipper);  break;
                 }
                 updateTree(false);
             })

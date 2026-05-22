@@ -12,6 +12,7 @@ export class TreeNode {
   y: number | null = null;
   children: TreeNode[] = [];
   cursorAt: boolean = false;
+  cursorSelected: boolean = false;
 
   constructor(value: string) {
     this.value = value;
@@ -59,7 +60,10 @@ export class TreeNode {
 
     context.beginPath();
     context.arc(this.x, this.y, RADIUS, 0, Math.PI * 2, false);
-    context.fillStyle = this.cursorAt ? '#FFD580' : 'white';
+    context.fillStyle = 'white';
+    if (this.cursorAt) context.fillStyle = '#FFD580'
+    if (this.cursorSelected) context.fillStyle = '#accbfc';
+    if (this.cursorAt && this.cursorSelected) context.fillStyle = '#b9ebeb';
     context.fill();
     context.strokeStyle = '#212121';
     context.lineWidth = 1;
@@ -77,6 +81,7 @@ export function convertSToTree(sNode: SExpression, zipper: Zipper): TreeNode {
   const treenode = new TreeNode(sNode.value);
   //console.log("sNode:", formatS(sNode), "\nfocus:", formatS(zipper.focus));
   if (sNode === zipper.focus ) treenode.cursorAt = true;
+  if (zipper.selected !== null && sNode === zipper.selected.self ) treenode.cursorSelected = true;
   if (sNode.type === 'Atom') {
     return treenode;
   } 
