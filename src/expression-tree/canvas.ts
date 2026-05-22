@@ -12,7 +12,11 @@ const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
 const expressionInput = document.getElementById('expression-input') as HTMLInputElement;
 const mathDisplay = document.getElementById('math-display');
 let activeMode : 'old' | 'nary' = 'old';
+let currentSExpression : SExpression | null;
 let currentRoot: TreeNode | null;
+
+function clearCanvas() { 
+    ctx.clearRect(0, 0, canvas.width, canvas.height) }
 
 function render() {
     const container = document.getElementById('canvas-container');
@@ -28,10 +32,22 @@ function render() {
     }
 }
 
-function clearCanvas() { 
-    ctx.clearRect(0, 0, canvas.width, canvas.height) }
+// Make tree from new SExpression. Meant to offload the work of generateTree()
+function updateTree(isCanonicalize = false){
+    // Update mathDisplay
+    if (isCanonicalize){
+        currentSExpression = canonicalize(currentSExpression!);
+        mathDisplay!.textContent = displayS(currentSExpression!);
+        if ((window as any).MathJax) {
+            (window as any).MathJax.typesetPromise([mathDisplay])
+                .catch((err: any) => console.log('MathJax typeset failed: ', err));
+        } 
+    }
+    printS(currentSExpression!); 
+    currentRoot = convertSToTree(currentSExpression!);
+    render();
 
-
+}
 
 // Button functions
 function generateTree(isCanonicalize = false){
@@ -39,18 +55,8 @@ function generateTree(isCanonicalize = false){
     let expression = expressionInput.value
     if (typeof expression !== 'undefined' && null != expression) {
         try {
-            let sExpression = parseExpression(new Lexer(expression), 0);
-            if (isCanonicalize){
-                sExpression = canonicalize(sExpression); 
-                mathDisplay!.textContent = displayS(sExpression);
-                if ((window as any).MathJax) {
-                    (window as any).MathJax.typesetPromise([mathDisplay])
-                        .catch((err: any) => console.log('MathJax typeset failed: ', err));
-                }
-            }
-            printS(sExpression); 
-            currentRoot = convertSToTree(sExpression);
-            render();
+            currentSExpression = parseExpression(new Lexer(expression), 0);
+            updateTree(isCanonicalize);
             
         } catch (error) {
             if (error instanceof SyntaxError){
