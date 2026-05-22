@@ -7,9 +7,11 @@ interface Crumb {
 }
 
 export class Zipper {
+    public root: SExpression;
     public focus: SExpression;
     private path: Crumb[];
     constructor(root: SExpression){
+        this.root = root;
         this.focus = root;
         this.path = [];
     }
@@ -17,9 +19,11 @@ export class Zipper {
   // 1. GO DOWN: Step into a specific child
   // ==========================================
     public goDown(targetIndex: number) {
-        if (this.focus.type === 'Atom') throw new Error("Can't go down atom node");
+        if (this.focus.type === 'Atom'){
+            console.log("Can't go down atom node"); return;
+        } 
         if (targetIndex < 0 || targetIndex >= this.focus.rest.length) {
-            throw new Error("Child index out of bounds");
+           console.log("Child index out of bounds"); return;
         }
         const parentNode = this.focus;
         // Split the siblings around the target child
@@ -40,7 +44,7 @@ export class Zipper {
     // ==========================================
     public goUp() {
     if (this.path.length === 0) {
-        throw new Error("Already at the root node");
+        console.log("Already at the root node"); return;
     }
         // Pop the most recent history crumb off our stack
         const currentCrumb = this.path.pop()!;
@@ -51,11 +55,11 @@ export class Zipper {
     // ==========================================
     public goRight() {
         if (this.path.length === 0) {
-            throw new Error("Cannot move right at the root");
+            console.log("Cannot move right at the root"); return;
     }
         const currentCrumb = this.path.at(-1);
         if (currentCrumb!.rightSiblings.length === 0) {
-            throw new Error("No more right siblings");
+            console.log("No more right siblings"); return;
         }
         // Pop the next sibling from the end of the right stack
         const nextFocus = currentCrumb!.rightSiblings.pop()!;
@@ -68,11 +72,11 @@ export class Zipper {
     // ==========================================
     public goLeft() {
         if (this.path.length === 0) {
-            throw new Error("Cannot move left at the root");
+            console.log("Cannot move left at the root"); return;
         }
         const currentCrumb = this.path.at(-1);
         if (currentCrumb!.leftSiblings.length === 0) {
-            throw new Error("No more left siblings");
+            console.log("No more left siblings"); return;
         }
         // Pop the next sibling from the end of the left stack
         const nextFocus = currentCrumb!.leftSiblings.pop()!;

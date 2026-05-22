@@ -5,6 +5,7 @@ import { convertSToTree, calculateTreeLayout, TreeNode, drawTree } from './tree'
 import { parseExpression, formatS, type SExpression, canonicalize  } from './parser'
 import { Lexer } from './lexer';
 import { displayS } from './math-display';
+import { Zipper } from './zipper';
 import { exp } from 'mathjs';
 
 const canvas = document.querySelector('canvas') as HTMLCanvasElement;
@@ -13,7 +14,8 @@ const expressionInput = document.getElementById('expression-input') as HTMLInput
 const mathDisplay = document.getElementById('math-display');
 let activeMode : 'old' | 'nary' = 'old';
 let currentSExpression : SExpression | null;
-let currentRoot: TreeNode | null;
+let currentRoot: TreeNode | null;   // Current Visual Tree root
+let currentZipper: Zipper | null = null;
 
 function clearCanvas() { 
     ctx.clearRect(0, 0, canvas.width, canvas.height) }
@@ -33,20 +35,11 @@ function render() {
 }
 
 // Make tree from new SExpression. Meant to offload the work of generateTree()
-function updateTree(isCanonicalize = false){
-    // Update mathDisplay
-    if (isCanonicalize){
-        currentSExpression = canonicalize(currentSExpression!);
-        mathDisplay!.textContent = displayS(currentSExpression!);
-        if ((window as any).MathJax) {
-            (window as any).MathJax.typesetPromise([mathDisplay])
-                .catch((err: any) => console.log('MathJax typeset failed: ', err));
-        } 
-    }
-    printS(currentSExpression!); 
-    currentRoot = convertSToTree(currentSExpression!);
+function updateTree(newZipper = false){
+    if (currentZipper === null || newZipper)
+        currentZipper = new Zipper(currentSExpression!);
+    currentRoot = convertSToTree(currentSExpression!, currentZipper);
     render();
-
 }
 
 // Button functions
@@ -56,7 +49,17 @@ function generateTree(isCanonicalize = false){
     if (typeof expression !== 'undefined' && null != expression) {
         try {
             currentSExpression = parseExpression(new Lexer(expression), 0);
-            updateTree(isCanonicalize);
+            // Canonicalize and update mathDisplay
+            if (isCanonicalize){
+                currentSExpression = canonicalize(currentSExpression!);
+                mathDisplay!.textContent = displayS(currentSExpression!);
+                if ((window as any).MathJax) {
+                    (window as any).MathJax.typesetPromise([mathDisplay])
+                        .catch((err: any) => console.log('MathJax typeset failed: ', err));
+                } 
+                printS(currentSExpression!); 
+            }
+            updateTree(true);
             
         } catch (error) {
             if (error instanceof SyntaxError){
@@ -107,11 +110,32 @@ function init() {
     document.getElementById('randomize')!.addEventListener('click', randomizeExpression);
     document.getElementById('canonicalize')!.addEventListener('click', ()=> { generateTree(true) });
     window.addEventListener('resize', render);
-
+    
     expressionInput.value = SAMPLE_EXPRESSIONS[Math.floor(Math.random() * SAMPLE_EXPRESSIONS.length)]
     expressionInput.value = 'a+(b+c+d)'
     setTimeout(() => {
-        document.getElementById('generate-tree')!.click()
+        document.getElementById('generate-tree')!.click();
+        // Add keyboard key detection for cursor control
+        if (currentRoot !== null){
+            window.addEventListener('keydown', (event)=> {
+                if (currentZipper === null) return;
+                switch (event.key){
+                    case "ArrowDown":
+                        event.preventDefault();
+                        currentZipper.goDown(0); break;
+                    case "ArrowUp":
+                        event.preventDefault();
+                        currentZipper.goUp(); break;
+                    case "ArrowLeft":
+                        event.preventDefault();
+                        currentZipper.goLeft(); break;
+                    case "ArrowRight":
+                        event.preventDefault();
+                        currentZipper.goRight(); break;
+                }
+                updateTree(false);
+            })
+        }
     }, 500)
 };
 init();
