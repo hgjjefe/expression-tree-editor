@@ -10,7 +10,7 @@ function swap(arr: any[], i: number, j: number){
 }
 
 // Function to execute when SPACE is pressed
-export function selectNode(zipper: Zipper): boolean{
+export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boolean{
     let isSimplifyTree : boolean = false;
     //console.log("selected:", zipper.selected?.self);
     // Prevent selecting root node for now
@@ -53,15 +53,17 @@ export function selectNode(zipper: Zipper): boolean{
     // MOVE TERM to opposite side of equation
     else if (zipper.selectedPath.length <= 2 && zipper.path.length == 1 // Only allow move top-2 to top-1 layer
      && zipper.root.value === '='            // Only allow if this tree is an equation
-     && ( ['+', '-', '='].includes( zipper.selected.parent.value ) )
+     && ( ['+', '-', '=', '*', 'inv'].includes( zipper.selected.parent.value ) )
      && zipper.selected.parent.value !== '-'
+     && !( zipper.selected.parent.value === '*' && mode === 'plus'  )  // mode mismatch
+     && !( zipper.selected.parent.value === '+' && mode === 'mult'  )
      ){
         console.log("Move terms across equation")
         // Put this unnecessarily check to shut ts compiler up
         if (zipper.root.type === 'Atom' || zipper.selected.parent.type === 'Atom'){ 
             resetSelected(); return false; }
-        let lhsBranch = zipper.root.rest[0];
-        let rhsBranch = zipper.root.rest[1];
+        //let lhsBranch = zipper.root.rest[0];
+        //let rhsBranch = zipper.root.rest[1];
         let selectedBranch = zipper.selectedPath[0].self;
         let focus = zipper.focus
         if (selectedBranch === focus){ // Redundant check, but just to be safe
@@ -70,26 +72,39 @@ export function selectNode(zipper: Zipper): boolean{
         }
         let focusIndex = zipper.path.at(-1)!.leftSiblings.length;
         let selectedIndex = zipper.selected.leftSiblings.length;
-        let isNegatedTerm = zipper.selected.self.value === '-';    // Is moved "-Term"?
+
+        let isInvTerm = zipper.selected.self.value === 'inv';
         let selectedNode: SExpression = zipper.selected.self
+        //let pushOp = focus.value
         let currentCrumb = zipper.path.at(-1)!;
+        let invertOp = mode === 'plus' ? '-' : 'inv'
         // Move and add PLUS/MINUS operator to the top of the other side
-        if (!isNegatedTerm){
-            selectedNode = insertOpAtTop(zipper.selectedPath.at(-1)!, null, selectedIndex, '-')!;
-        }else {
+        // Invert selected node
+        if (selectedNode.type === 'Atom' || selectedNode.value === '+' ){
+            selectedNode = insertOpAtTop(zipper.selectedPath.at(-1)!, null, selectedIndex, invertOp)!;
+        }else if (selectedNode.value === '-')  {
+            selectedNode = removeOpAtTop(zipper.selectedPath.at(-1)!, selectedIndex);
+        }else if (selectedNode.value === '*')  {
+            selectedNode = insertOpAtTop(zipper.selectedPath.at(-1)!, null, selectedIndex, invertOp)!;
+        }else if (selectedNode.value === 'inv'){
             selectedNode = removeOpAtTop(zipper.selectedPath.at(-1)!, selectedIndex);
         }
-        if (focus.type !== 'Atom' && focus.value === '+' )
+        if ((focus.type !== 'Atom') && ((focus.value === '+' && mode === 'plus') || (focus.value === '*' && mode === 'mult'))   )
             focus.rest.push(selectedNode);
         else{
-            insertOpAtTop(currentCrumb, selectedNode, focusIndex, '+')
+            //if (focus.value === '-')
+            if (mode === 'plus')
+                insertOpAtTop(currentCrumb, selectedNode, focusIndex, '+')
+            else if  (mode === 'mult')
+                insertOpAtTop(currentCrumb, selectedNode, focusIndex, '*')
+            //else if (focus.value === '/')
+             //   insertOpAtTop(currentCrumb, selectedNode, focusIndex, '*')
         }
 
         // zipper.focus =  {type: 'Cons', value: '+', rest: [focus, selectedNode]} ;
         zipper.selected.parent.rest.splice(selectedIndex,1);
         if ( zipper.root.rest.length < 2 ){  // Insert 0 if a side is empty
-            console.log("Find 0")
-            zipper.root.rest.splice( selectedIndex, 0, {type: 'Atom', value: '0'} );
+            zipper.root.rest.splice( selectedIndex, 0, {type: 'Atom', value: mode === 'plus' ? '0' : '1'} );
         }
         // console.log("left:", zipper.selected.parent.rest)
         // if (zipper.root.rest.length < 2)  // No terms left at a side after moving
@@ -138,29 +153,39 @@ export function simplifyTree(sNode: SExpression): SExpression {
             const nonZeroChildren = simplifiedChildren.filter(
                 child => !(child.type === 'Atom' && child.value === '0')
             );
-
             // Safety Guard: If EVERY child was 0 (e.g. 0 + 0), return a single solid '0' Atom
             if (nonZeroChildren.length === 0) {
                 return { type: 'Atom', value: '0' };
             }
-
             // If only one non-zero child remains, the '+' operator is redundant!
             if (nonZeroChildren.length === 1) {
                 return nonZeroChildren[0];
             }
-
             return { type: 'Cons', value: '+', rest: nonZeroChildren };
         }
 
         // 3. Handle Multiplication Rules: (* x 0) -> 0
         if (sNode.value === '*') {
+            // Filter out any ones from the addition array
+            const nonOneChildren = simplifiedChildren.filter(
+                child => !(child.type === 'Atom' && child.value === '1')
+            );
+            // Safety Guard: If EVERY child was 0 (e.g. 0 + 0), return a single solid '0' Atom
+            if (nonOneChildren.length === 0) {
+                return { type: 'Atom', value: '1' };
+            }
+            // If only one non-zero child remains, the '*' operator is redundant!
+            if (nonOneChildren.length === 1) {
+                return nonOneChildren[0];
+            }
             const hasZero = simplifiedChildren.some(
                 child => child.type === 'Atom' && child.value === '0'
             );
             // Annihilation property: anything times 0 becomes a single solid 0
             if (hasZero) {
                 return { type: 'Atom', value: '0' };
-            }
+            } else
+            return { type: 'Cons', value: '*', rest: nonOneChildren };
         }
 
         // Default: Return the operator with its simplified children intact

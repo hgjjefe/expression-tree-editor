@@ -27,7 +27,7 @@ export class Lexer {
                     value += input[i];
                     i++;  }
                 i--; 
-                tokens.push({ type: 'Atom', value: value });
+                tokens.push({ type: 'Atom', value: value.replace(/^0+/, '') || '0' });
             } // Operators
             else if ('+-*/^!()=√'.indexOf(char) !== -1) {
                 // Everything else is treated as an Operator

@@ -1,5 +1,6 @@
 import { type SExpression  } from "./parser";
 import { getInfixBP, getPrefixBP, getPostfixBP, PREFIX_BINDING_POWERS } from "./binding-powers";
+import { num } from "mathjs";
 
 export function displayS(sNode: SExpression): string {
     // SExpression -> [Sstring, op, 'pre'|'in'|'post']
@@ -53,8 +54,15 @@ export function displayS(sNode: SExpression): string {
                         stack.push(cStr);
                     }else{
                         let numeratorStr =  stack.pop();
+                        // Strip numerator outermost PAREN
+                        if (numeratorStr!.at(0) === '(' && numeratorStr!.at(-1) === ')'){
+                            numeratorStr = numeratorStr!.slice(1,-1);
+                        }
                         stack.push( `\\frac{${numeratorStr}}{${cStr.slice(3)}}` );
                     }
+                }  // Also convert first string to fraction
+                if (stack[0].length >= 3 && stack[0].slice(0,3) === 'inv' ){
+                    stack[0] = `\\frac{1}{${stack[0].slice(3)}}`
                 }
                 childStrings = stack;
             }
@@ -76,7 +84,7 @@ export function displayS(sNode: SExpression): string {
         else if (op === '√' ){
             return [ `\\sqrt{${sString}}`, op, 'pre']; }
         else if (op === 'inv' ){  //  a^(-1)
-            return [ `inv ${sString}`, op, 'pre']; }
+            return [ `inv${sString}`, op, 'pre']; }
         else if (op === '!' ){  //  a^(-1)
             return [ `${sString}!`, op, 'post']; }
         // Other Prefix functions

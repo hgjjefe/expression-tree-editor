@@ -171,6 +171,9 @@ export function grammarCheck(sNode: SExpression): boolean{
   function dfs(root: SExpression, depth = 0){
       if (root.type === 'Atom') return true;
       if (root.value === '=' && depth > 0) return false;
+      if (root.value === 'inv' && root.rest[0].value === '0'){ // Divison by 0
+          throw new SyntaxError("Can't divide by zero.")
+      }
       for (let node of root.rest){
           if (!dfs(node, depth + 1))
               return false;

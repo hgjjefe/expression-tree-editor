@@ -41,7 +41,9 @@ function updateTree(isCanonicalize = false, newZipper = false){
     if (isCanonicalize){
         currentSExpression = canonicalize(currentSExpression!);
         printS(currentSExpression!); 
+        grammarCheck(currentSExpression!);
     }
+
     if (currentZipper === null || newZipper)
         currentZipper = new Zipper(currentSExpression!);
     currentRoot = convertSToTree(currentSExpression!, currentZipper);
@@ -60,7 +62,6 @@ function generateTree(isCanonicalize = false){
     if (typeof expression !== 'undefined' && null != expression) {
         try {
             currentSExpression = parseExpression(new Lexer(expression), 0);
-            grammarCheck(currentSExpression);
             updateTree(isCanonicalize, true);
             
         } catch (error) {
@@ -114,7 +115,7 @@ function init() {
     window.addEventListener('resize', render);
     
     expressionInput.value = SAMPLE_EXPRESSIONS[Math.floor(Math.random() * SAMPLE_EXPRESSIONS.length)]
-    expressionInput.value = 'a+(b+c+d)=t'
+    expressionInput.value = "(a - b) * (c + d) / z=t"
     setTimeout(() => {
         document.getElementById('generate-tree')!.click();
         // Add keyboard key detection for cursor control
@@ -145,7 +146,10 @@ function init() {
                 switch (event.code){
                     case "Space":   // Select a node
                         event.preventDefault();
-                        isSimplyTree =  selectNode(currentZipper);  break;
+                        isSimplyTree =  selectNode(currentZipper, 'plus');  break;
+                    case "KeyF":   // Select a node
+                        event.preventDefault();
+                        isSimplyTree =  selectNode(currentZipper, 'mult');  break;
                 }
                 if (isSimplyTree)
                     currentSExpression = simplifyTree(currentSExpression!);
