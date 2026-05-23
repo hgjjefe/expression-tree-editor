@@ -2,12 +2,12 @@ import { generateTreeOld } from './old/utils';
 import Swal from 'sweetalert2';
 
 import { convertSToTree, calculateTreeLayout, TreeNode, drawTree } from './tree';
-import { parseExpression, formatS, type SExpression, canonicalize  } from './parser'
+import { parseExpression, formatS, type SExpression, canonicalize, grammarCheck  } from './parser'
 import { Lexer } from './lexer';
 import { displayS } from './math-display';
 import { Zipper } from './zipper';
-import { selectNode } from './cursor';
-import { exp } from 'mathjs';
+import { selectNode, simplifyTree } from './cursor';
+import { exp, simplify } from 'mathjs';
 
 const canvas = document.querySelector('canvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
@@ -36,7 +36,12 @@ function render() {
 }
 
 // Make tree from new SExpression. Meant to offload the work of generateTree()
-function updateTree(newZipper = false){
+function updateTree(isCanonicalize = false, newZipper = false){
+    // Canonicalize and update mathDisplay
+    if (isCanonicalize){
+        currentSExpression = canonicalize(currentSExpression!);
+        printS(currentSExpression!); 
+    }
     if (currentZipper === null || newZipper)
         currentZipper = new Zipper(currentSExpression!);
     currentRoot = convertSToTree(currentSExpression!, currentZipper);
@@ -55,12 +60,8 @@ function generateTree(isCanonicalize = false){
     if (typeof expression !== 'undefined' && null != expression) {
         try {
             currentSExpression = parseExpression(new Lexer(expression), 0);
-            // Canonicalize and update mathDisplay
-            if (isCanonicalize){
-                currentSExpression = canonicalize(currentSExpression!);
-                printS(currentSExpression!); 
-            }
-            updateTree(true);
+            grammarCheck(currentSExpression);
+            updateTree(isCanonicalize, true);
             
         } catch (error) {
             if (error instanceof SyntaxError){
@@ -128,7 +129,8 @@ function init() {
                 switch (event.key){
                     case "ArrowDown":
                         event.preventDefault();
-                        currentZipper.goDown(0); break;
+                        let midIndex = currentZipper.focus.type === 'Cons' ? Math.floor((currentZipper.focus.rest.length-1) / 2)  : 0
+                        currentZipper.goDown(midIndex); break;
                     case "ArrowUp":
                         event.preventDefault();
                         currentZipper.goUp(); break;
@@ -139,12 +141,15 @@ function init() {
                         event.preventDefault();
                         currentZipper.goRight(); break;
                 }
+                let isSimplyTree = false;
                 switch (event.code){
                     case "Space":   // Select a node
                         event.preventDefault();
-                        selectNode(currentZipper);  break;
+                        isSimplyTree =  selectNode(currentZipper);  break;
                 }
-                updateTree(false);
+                if (isSimplyTree)
+                    currentSExpression = simplifyTree(currentSExpression!);
+                updateTree(false, isSimplyTree);
             })
         }
     }, 500)
