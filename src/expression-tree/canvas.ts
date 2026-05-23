@@ -113,7 +113,7 @@ function init() {
     window.addEventListener('resize', render);
     
     expressionInput.value = SAMPLE_EXPRESSIONS[Math.floor(Math.random() * SAMPLE_EXPRESSIONS.length)]
-    expressionInput.value = 'a+(b+c+d)'
+    expressionInput.value = 'a+(b+c+d)=t'
     setTimeout(() => {
         document.getElementById('generate-tree')!.click();
         // Add keyboard key detection for cursor control
