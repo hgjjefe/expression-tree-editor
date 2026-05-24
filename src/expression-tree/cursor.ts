@@ -1,4 +1,4 @@
-import { smaller } from 'mathjs';
+import { re, smaller } from 'mathjs';
 import { type SExpression, formatS } from './parser';
 import { Zipper, type Crumb } from './zipper'
 
@@ -51,14 +51,21 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         // console.log("swap (sel, focus):", selectedIndex, focusIndex)
     }  
     // MOVE TERM to opposite side of equation
-    else if (zipper.selectedPath.length <= 2 && zipper.path.length == 1 // Only allow move top-2 to top-1 layer
+    else if (zipper.selectedPath.length <= 2 && zipper.path.length <= 2 // Only allow move top-2 layer
      && zipper.root.value === '='            // Only allow if this tree is an equation
      && ( ['+', '-', '=', '*', 'inv'].includes( zipper.selected.parent.value ) )
-     && zipper.selected.parent.value !== '-'
-     ){ if ( ( zipper.selected.parent.value === '*' && mode === 'plus'  )  // mode mismatch
+     && zipper.selected.parent.value !== '-'    
+     ){   
+        let currentCrumb = zipper.path.at(-1)!; if(currentCrumb.parent.type==='Atom')return false;
+         // Check if mode matches
+        if ( ( zipper.selected.parent.value === '*' && mode === 'plus'  ) 
             || ( zipper.selected.parent.value === '+' && mode === 'mult'  )){
             console.log("Mode mismatch. Cannot move terms.");
             resetSelected(); return false; }
+        // If focus is level 2 then it must be numLiteral and parent must be '+' or '-'
+        if ( zipper.path.length === 2 && (!['+','-'].includes(currentCrumb.parent.value)|| !isNumeric(zipper.focus.value) ) ){
+            console.log("Cant move to non-number level 2 focus");
+        }
         console.log("Move terms across equation")
         // Put this unnecessarily check to shut ts compiler up
         if (zipper.root.type === 'Atom' || zipper.selected.parent.type === 'Atom'){ 
@@ -77,10 +84,9 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         let focusIndex = zipper.path.at(-1)!.leftSiblings.length;
         let selectedIndex = zipper.selected.leftSiblings.length;
 
-        let isInvTerm = zipper.selected.self.value === 'inv';
         let selectedNode: SExpression = zipper.selected.self
         //let pushOp = focus.value
-        let currentCrumb = zipper.path.at(-1)!;
+
         let invertOp = mode === 'plus' ? '-' : 'inv'
         // Invert selected node
         if (selectedNode.type === 'Atom' || ['+','*'].includes( selectedNode.value) ){
@@ -88,11 +94,20 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         }else if ( ['-','inv'].includes( selectedNode.value) )  {
             selectedNode = removeOpAtTop(zipper.selectedPath.at(-1)!, selectedIndex);
         }
-        // Move and add PLUS/MINUS operator to the top of the other side
-        if ((focus.type !== 'Atom') && ((focus.value === '+' && mode === 'plus') || (focus.value === '*' && mode === 'mult'))   )
-            focus.rest.push(selectedNode);
-        else{
-            //if (focus.value === '-')
+        // MOVE and add PLUS/MINUS operator to the top of the other side
+        // If two number literals, Combine number literals automatically
+        if ( isNodeLiteral(selectedNode) && isNodeLiteral(focus)  ){
+            console.log("NumNum")
+            let op = mode === 'plus' ? '+' : '-'
+            let res = evaluateNodes(op, focus, selectedNode);
+            console.log("Evalto:", res?.value)
+            currentCrumb.parent.rest[focusIndex] = res!;  
+        }
+          // Don't make a new op node
+        else if ((focus.type !== 'Atom') && ((focus.value === '+' && mode === 'plus') || (focus.value === '*' && mode === 'mult'))   ){
+            focus.rest.push(selectedNode);  
+        }
+        else{   // Insert a new op node at top
             if (mode === 'plus')
                 insertOpAtTop(currentCrumb, selectedNode, focusIndex, '+')
             else if  (mode === 'mult')
@@ -102,6 +117,7 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         }
 
         // zipper.focus =  {type: 'Cons', value: '+', rest: [focus, selectedNode]} ;
+        // Delete original selected node
         zipper.selected.parent.rest.splice(selectedIndex,1);
         if ( zipper.root.rest.length < 2 ){  // Insert 0 if a side is empty
             zipper.root.rest.splice( selectedIndex, 0, {type: 'Atom', value: mode === 'plus' ? '0' : '1'} );
@@ -139,6 +155,21 @@ function removeOpAtTop(crumb: Crumb, childIndex: number): SExpression{
     crumb.parent.rest[childIndex] = res
     return res;
 }
+function isNumeric(str: string): boolean{
+    return /^\d+$/.test(str);
+}
+// Check if node is in the form [number] or [-] -> [number]
+function isNodeLiteral(sNode: SExpression): boolean{
+    if (sNode.type === 'Atom'){
+        if ( isNumeric(sNode.value) ) return true;
+        return false;
+    }
+    if ( sNode.value !== '-'  ) return false;
+    if ( isNumeric(sNode.rest[0].value)) return true;
+    return false;
+}
+
+
 // Simply Tree after a tranformation (Gemini version)
 export function simplifyTree(sNode: SExpression): SExpression {
     function simplifyHelper(sNode: SExpression): SExpression {
@@ -155,6 +186,7 @@ export function simplifyTree(sNode: SExpression): SExpression {
             );
             // Safety Guard: If EVERY child was 0 (e.g. 0 + 0), return a single solid '0' Atom
             if (nonZeroChildren.length === 0) {
+                
                 return { type: 'Atom', value: '0' };
             }
             // If only one non-zero child remains, the '+' operator is redundant!
@@ -195,41 +227,60 @@ export function simplifyTree(sNode: SExpression): SExpression {
     return simplifyHelper(sNode);
 }
 
+
+
+// Evaluate two number node literals into a single node literal (i.e. a number node or negated number node)
+function evaluateNodes(op: string, sA: SExpression, sB: SExpression):SExpression|null{
+    // Only allow number op number for now
+    if (!['+','*'].includes(op)){
+        console.log("EvalNode dont support operators other than '+' and '*'."); return null;
+    }
+    let vA = sA.value; let vB = sB.value;
+    // Reject if node value is neither a number or NEG
+    if ( !isNumeric(vA) && vA !== '-' || !isNumeric(vB) && vB !== '-' ){
+        console.log("Cant operate non-numbers for now"); return null;
+    }
+    if (op === '+'){
+        let lA = sA.type==='Cons'&& sA.value === '-'? '-'+sA.rest[0].value  : sA.value;
+        let lB = sB.type==='Cons'&& sB.value === '-'? '-'+sB.rest[0].value  : sB.value;
+        let res = parseInt(lA) + parseInt(lB);
+        if (res >= 0)
+            return { type:'Atom', value: res.toString() };
+        else
+            return { type:'Cons', value: '-', rest: [ {type:'Atom', value:(-res).toString()}] };
+    } // else '*'
+        // Currently dont support fractions
+        if (sA.type==='Cons'&& sA.value === 'inv' || sB.type==='Cons'&& sB.value === '-'){
+            return null;
+        }
+        let lA = sA.type==='Cons'&& sA.value === '-'? '-'+sA.rest[0].value  : sA.value;
+        let lB = sB.type==='Cons'&& sB.value === '-'? '-'+sB.rest[0].value  : sB.value;
+        let res = parseInt(lA) + parseInt(lB);
+        if (res >= 0)
+            return { type:'Atom', value: res.toString() };
+        else
+            return { type:'Cons', value: '-', rest: [ {type:'Atom', value:(-res).toString()}] };
+
+}
+
+
 /*
 export function simplifyTree(sNode: SExpression): SExpression{
-
     function simplifyHelper(sNode:SExpression): SExpression|null{
-
         if (sNode.type === 'Atom' && sNode.value === '0' ){
-
             return null;
-
         }
-
         else if (sNode.type === 'Atom' || sNode.rest.length === 0 ) return sNode;
-
         // Discard Unary plus
-
         if (sNode.value === '+' && sNode.rest.length === 1 ){
-
             return sNode.rest[0];
-
         }
-
-       
-
         let rest : SExpression[] = sNode.rest.map( (s) => simplifyHelper(s) )
-
                         .filter( (s) => s !== null  );
-
         return { type: 'Cons', value: sNode.value, rest: [...rest] };
-
     }
-
     let result = simplifyHelper(sNode);
-
     if (result === null) return sNode;
-
     return result;
 
 } 
