@@ -1,8 +1,8 @@
-import { type SExpression } from "./parser";
+import { type SExpression, type Cons } from "./parser";
 
 export interface Crumb {
     self: SExpression
-    parent: SExpression
+    parent: Cons
     leftSiblings: SExpression[]
     rightSiblings: SExpression[]
 }

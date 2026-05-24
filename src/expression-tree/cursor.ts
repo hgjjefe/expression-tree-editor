@@ -1,4 +1,4 @@
-import { type SExpression, formatS } from './parser';
+import { type SExpression, formatS, type Atom, type Cons } from './parser';
 import { Zipper, type Crumb } from './zipper'
 
 // Helper function to swap array elements
@@ -8,20 +8,37 @@ function swap(arr: any[], i: number, j: number){
     [arr[i], arr[j]] = [arr[j], arr[i]];
 }
 
-// type ValidEquationZipper = Zipper & {
-//     root.type = 'Cons';
-//     selected: Crumb & { parent: Cons; self: SExpression };
-//     path: Crumb[];
-// };
-
-// function assertValidMove(zipper: Zipper, mode: 'plus' | 'mult'): asserts zipper is ValidatedEquationZipper {
-//     if (zipper.root.type === 'Atom' || zipper.root.value !== '=') throw new Error();
-//     if (!zipper.selected || zipper.selected.parent.type === 'Atom') throw new Error();
+type EquationZipper = Zipper & {
+    root: Omit<Cons, 'value'> & { value: '=' } ;
+};
+// Check canMoveTermAcross rules and use the EquationZipper type to shut TS compiler up
+function assertValidMove(zipper: Zipper, mode: 'plus' | 'mult'): asserts zipper is EquationZipper {
+    if (zipper.root.type === 'Atom' || zipper.root.value !== '=') throw new Error("Not an equation.");
+    if (!zipper.selected) throw new Error("No selected node");
     
-//     const parentValue = zipper.selected.parent.value;
-//     if (parentValue === '*' && mode === 'plus') throw new Error();
-//     // ... add the rest of your checks here
-// }
+    const parentValue = zipper.selected.parent.value;
+    if (parentValue === '*' && mode === 'plus' || parentValue === '+' && mode === 'mult') 
+        throw new Error("Mode mismatches selected node. Cannot move terms.");
+    let currentCrumb = zipper.path.at(-1)!;      
+    // If focus is level 2 then it must be numLiteral and parent must be '+' or '*'
+    if ( zipper.path.length === 2  ){
+        if (!['+','*'].includes(currentCrumb.parent.value)|| !isNumLiteral(zipper.focus) ){
+            throw new Error("Cant move to non-number/non-comm operand level 2 focus");
+        }  // Check if mode matches the destination's parent operand
+        if ( ( currentCrumb.parent.value === '*' && mode === 'plus'  ) 
+        || ( currentCrumb.parent.value === '+' && mode === 'mult'  )){
+            throw new Error("Mode mismatch destination node. Cannot move terms.");
+        }
+    }
+    // Cannot move 0 node for simplicity (otherwise you may create many duplicates of 0)
+    if (zipper.selected.self.value === '0') 
+        throw new Error("Cannot move 0.");
+    // Check if selected node and destination are different sides
+    if (zipper.selectedPath[0].self === zipper.path[0].self) 
+        throw new Error("Cant move terms to diffrent levels of same side");
+        
+    // ... add the rest of your checks here
+}
 
 // Function to execute when SPACE is pressed
 export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boolean{
@@ -60,7 +77,7 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         // Auto evaluate num literals
         if ( isNumLiteral(zipper.selected.self) && isNumLiteral(zipper.focus) ){
             let currentCrumb = zipper.path.at(-1)!;
-            if(currentCrumb.parent.type==='Atom' || zipper.root.type==='Atom'||zipper.selected.parent.type==='Atom')return false;
+            if( zipper.root.type==='Atom')return false;
             let op = mode === 'plus' ? '+' : '*'
             let res = evaluateNodes(op, zipper.focus, zipper.selected.self);
             console.log("Eval to:", res?.value)
@@ -75,7 +92,6 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         }
         // Swap selected node with current node
         let sNode = zipper.selected.parent
-        if (sNode.type === 'Atom') return false;
         swap(sNode.rest, selectedIndex, focusIndex);
         zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
         zipper.goDown(focusIndex);
@@ -85,46 +101,21 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
     else if (zipper.selectedPath.length <= 2 && zipper.path.length <= 2 // Only allow move top-2 layer
      && zipper.root.value === '='            // Only allow if this tree is an equation
      && ( ['+', '=', '*'].includes( zipper.selected.parent.value ) )  
-     ){   
-        let currentCrumb = zipper.path.at(-1)!; if(currentCrumb.parent.type==='Atom')return false;
-         // Check if mode matches
-        if ( ( zipper.selected.parent.value === '*' && mode === 'plus'  ) 
-            || ( zipper.selected.parent.value === '+' && mode === 'mult'  )){
-            console.log("Mode mismatch selected node. Cannot move terms.");
-            resetSelected(); return false; }
-        // If focus is level 2 then it must be numLiteral and parent must be '+' or '*'
-        if ( zipper.path.length === 2  ){
-            if (!['+','*'].includes(currentCrumb.parent.value)|| !isNumLiteral(zipper.focus) ){
-                console.log("Cant move to non-number/non-comm operand level 2 focus");
-                resetSelected(); return false;
-            }  // Check if mode matches the destination's parent operand
-            if ( ( currentCrumb.parent.value === '*' && mode === 'plus'  ) 
-            || ( currentCrumb.parent.value === '+' && mode === 'mult'  )){
-                console.log("Mode mismatch destination node. Cannot move terms.");
-                resetSelected(); return false; }
-
-        }
-        console.log("Move terms across equation")
-        // Put this unnecessarily check to shut ts compiler up
-        if (zipper.root.type === 'Atom' || zipper.selected.parent.type === 'Atom'){ 
-            resetSelected(); return false; }
-        if (zipper.selected.self.value === '0'){ 
-            console.log("Cannot move 0.")
-            resetSelected(); return false; }
-        //let lhsBranch = zipper.root.rest[0];
-        //let rhsBranch = zipper.root.rest[1];
-        let selectedBranch = zipper.selectedPath[0].self;
-        let focus = zipper.focus
-        if (selectedBranch === focus){ // Redundant check, but just to be safe
-            console.log("Cant move terms across different layers of same side");
+     ){   // Check canMoveTermAcross conditions
+        try {
+            assertValidMove(zipper, mode);
+        } catch (error){
+            console.log((error as Error).message);
             resetSelected(); return false;
         }
+        console.log("Move terms across equation")
+        let currentCrumb = zipper.path.at(-1)!;
+        //let lhsBranch = zipper.root.rest[0];
+        //let rhsBranch = zipper.root.rest[1];
+        let focus = zipper.focus
         let focusIndex = zipper.path.at(-1)!.leftSiblings.length;
         let selectedIndex = zipper.selected.leftSiblings.length;
-
         let selectedNode: SExpression = zipper.selected.self
-        //let pushOp = focus.value
-
         let invertOp = mode === 'plus' ? '-' : 'inv'
         // ======= Transformation starts here =======
         // INVERT selected node
@@ -179,7 +170,7 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
 // Helper for mutating S Expression
 // given A,B, construct (+ A B) and redirect the pointers of parents (childIndex means being the n-th child)
 function insertOpAtTop(crumb: Crumb, newTerm: SExpression |null, childIndex: number, op = '+'): SExpression{
-    let res: SExpression;     if (crumb.parent.type === "Atom") return crumb.self;
+    let res: SExpression;
     if (newTerm === null){
         res = { type: 'Cons', value: op, rest: [crumb.self] }
     }
@@ -189,7 +180,7 @@ function insertOpAtTop(crumb: Crumb, newTerm: SExpression |null, childIndex: num
 }
 // Remove the top operator and return the first child
 function removeOpAtTop(crumb: Crumb, childIndex: number): SExpression{
-    if (crumb.self.type === "Atom"||crumb.parent.type === "Atom") return crumb.self; // Cant remove because it is not op
+    if (crumb.self.type === "Atom") return crumb.self; // Cant remove because it is not op
     let res = crumb.self.rest[0]
     crumb.parent.rest[childIndex] = res
     return res;
