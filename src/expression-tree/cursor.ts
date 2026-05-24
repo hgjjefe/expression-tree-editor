@@ -128,9 +128,9 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         let invertOp = mode === 'plus' ? '-' : 'inv'
         // ======= Transformation starts here =======
         // INVERT selected node
-        if (selectedNode.type === 'Atom' || ['+','*'].includes( selectedNode.value) ){
+        if (selectedNode.type === 'Atom' || ['+','*'].includes( selectedNode.value)||['-'].includes( selectedNode.value)&&mode==='mult'){
             selectedNode = insertOpAtTop(zipper.selectedPath.at(-1)!, null, selectedIndex, invertOp)!;
-        }else if ( ['-','inv'].includes( selectedNode.value) )  {
+        }else if ( ['-'].includes( selectedNode.value) && mode==='plus' || ['inv'].includes( selectedNode.value) && mode==='mult' )  {
             selectedNode = removeOpAtTop(zipper.selectedPath.at(-1)!, selectedIndex);
         }
         // MOVE and add PLUS/MINUS operator to the top of the other side
@@ -266,8 +266,6 @@ export function simplifyTree(sNode: SExpression): SExpression {
     return simplifyHelper(sNode);
 }
 
-
-
 // Evaluate two number node literals into a single node literal (i.e. a number node or negated number node)
 function evaluateNodes(op: string, sA: SExpression, sB: SExpression):SExpression|null{
     // Only allow number op number for now
@@ -289,7 +287,7 @@ function evaluateNodes(op: string, sA: SExpression, sB: SExpression):SExpression
             return { type:'Cons', value: '-', rest: [ {type:'Atom', value:(-res).toString()}] };
     } // else '*'
         // Currently dont support fractions
-        if (sA.type==='Cons'&& sA.value === 'inv' || sB.type==='Cons'&& sB.value === '-'){
+        if (sA.type==='Cons'&& sA.value === 'inv' || sB.type==='Cons'&& sB.value === 'inv'){
             return null;
         }
         let lA = sA.type==='Cons'&& sA.value === '-'? '-'+sA.rest[0].value  : sA.value;

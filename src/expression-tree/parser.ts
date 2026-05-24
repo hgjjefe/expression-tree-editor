@@ -4,9 +4,16 @@ import { Lexer, type Token } from './lexer';
 import { getInfixBP, getPrefixBP, getPostfixBP } from './binding-powers';
 
 // N-ary tree data structure to hold expressions
-export type SExpression =
-    | { type: 'Atom'; value: string }
-    | { type: 'Cons'; value: string; rest: SExpression[] };
+export interface Atom { 
+    type: 'Atom'; 
+    value: string; 
+}
+export interface Cons { 
+    type: 'Cons'; 
+    value: string; 
+    rest: SExpression[]; 
+}
+export type SExpression = Atom | Cons;
 
 export function formatS(node: SExpression): string {
   switch (node.type) {
