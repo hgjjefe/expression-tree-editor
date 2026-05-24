@@ -113,9 +113,11 @@ function init() {
     document.getElementById('randomize')!.addEventListener('click', randomizeExpression);
     document.getElementById('canonicalize')!.addEventListener('click', ()=> { generateTree(true) });
     window.addEventListener('resize', render);
+    window.addEventListener('keydown', (e)=> { if (e.code==='KeyR') document.getElementById('canonicalize')!.click() } );
     
     expressionInput.value = SAMPLE_EXPRESSIONS[Math.floor(Math.random() * SAMPLE_EXPRESSIONS.length)]
-    expressionInput.value = "(a - b) * (c + d) / z=t"
+    expressionInput.value = "(a - b) * (c + d) / z=t";
+    expressionInput.value = "a + 3 = 5"
     setTimeout(() => {
         document.getElementById('generate-tree')!.click();
         // Add keyboard key detection for cursor control

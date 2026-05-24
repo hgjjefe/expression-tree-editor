@@ -58,15 +58,21 @@ export function displayS(sNode: SExpression): string {
                         if (numeratorStr!.at(0) === '(' && numeratorStr!.at(-1) === ')'){
                             numeratorStr = numeratorStr!.slice(1,-1);
                         }
-                        stack.push( `\\frac{${numeratorStr}}{${cStr.slice(3)}}` );
+                        stack.push( `\\frac{${numeratorStr}}{${cStr.slice(4,-1)}}` );
                     }
                 }  // Also convert first string to fraction
                 if (stack[0].length >= 3 && stack[0].slice(0,3) === 'inv' ){
-                    stack[0] = `\\frac{1}{${stack[0].slice(3)}}`
+                    stack[0] = `\\frac{1}{${stack[0].slice(4,-1)}}`
                 }
                 childStrings = stack;
+            } 
+            else if (op === '=' || op === '+'){
+                childStrings = childStrings.map( (cStr) => {
+                    if (cStr.length >= 3 && cStr.slice(0,3) === 'inv' )
+                        cStr = `\\frac{1}{${cStr.slice(4,-1)}}`
+                    return cStr;
+                })
             }
-
             return [ childStrings.join(op), op, 'in'];
         }
         // Unary operator
@@ -84,7 +90,7 @@ export function displayS(sNode: SExpression): string {
         else if (op === '√' ){
             return [ `\\sqrt{${sString}}`, op, 'pre']; }
         else if (op === 'inv' ){  //  a^(-1)
-            return [ `inv${sString}`, op, 'pre']; }
+            return [ `inv(${sString})`, op, 'pre']; }
         else if (op === '!' ){  //  a^(-1)
             return [ `${sString}!`, op, 'post']; }
         // Other Prefix functions

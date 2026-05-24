@@ -53,18 +53,25 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
     // MOVE TERM to opposite side of equation
     else if (zipper.selectedPath.length <= 2 && zipper.path.length <= 2 // Only allow move top-2 layer
      && zipper.root.value === '='            // Only allow if this tree is an equation
-     && ( ['+', '-', '=', '*', 'inv'].includes( zipper.selected.parent.value ) )
-     && zipper.selected.parent.value !== '-'    
+     && ( ['+', '=', '*'].includes( zipper.selected.parent.value ) )  
      ){   
         let currentCrumb = zipper.path.at(-1)!; if(currentCrumb.parent.type==='Atom')return false;
          // Check if mode matches
         if ( ( zipper.selected.parent.value === '*' && mode === 'plus'  ) 
             || ( zipper.selected.parent.value === '+' && mode === 'mult'  )){
-            console.log("Mode mismatch. Cannot move terms.");
+            console.log("Mode mismatch selected node. Cannot move terms.");
             resetSelected(); return false; }
-        // If focus is level 2 then it must be numLiteral and parent must be '+' or '-'
-        if ( zipper.path.length === 2 && (!['+','-'].includes(currentCrumb.parent.value)|| !isNumeric(zipper.focus.value) ) ){
-            console.log("Cant move to non-number level 2 focus");
+        // If focus is level 2 then it must be numLiteral and parent must be '+' or '*'
+        if ( zipper.path.length === 2  ){
+            if (!['+','*'].includes(currentCrumb.parent.value)|| !isNumLiteral(zipper.focus) ){
+                console.log("Cant move to non-number/non-comm operand level 2 focus");
+                resetSelected(); return false;
+            }  // Check if mode matches the destination's parent operand
+            if ( ( currentCrumb.parent.value === '*' && mode === 'plus'  ) 
+            || ( currentCrumb.parent.value === '+' && mode === 'mult'  )){
+                console.log("Mode mismatch destination node. Cannot move terms.");
+                resetSelected(); return false; }
+
         }
         console.log("Move terms across equation")
         // Put this unnecessarily check to shut ts compiler up
@@ -96,9 +103,9 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         }
         // MOVE and add PLUS/MINUS operator to the top of the other side
         // If two number literals, Combine number literals automatically
-        if ( isNodeLiteral(selectedNode) && isNodeLiteral(focus)  ){
+        if ( isNumLiteral(selectedNode) && isNumLiteral(focus)  ){
             console.log("NumNum")
-            let op = mode === 'plus' ? '+' : '-'
+            let op = mode === 'plus' ? '+' : '*'
             let res = evaluateNodes(op, focus, selectedNode);
             console.log("Evalto:", res?.value)
             currentCrumb.parent.rest[focusIndex] = res!;  
@@ -159,7 +166,7 @@ function isNumeric(str: string): boolean{
     return /^\d+$/.test(str);
 }
 // Check if node is in the form [number] or [-] -> [number]
-function isNodeLiteral(sNode: SExpression): boolean{
+function isNumLiteral(sNode: SExpression): boolean{
     if (sNode.type === 'Atom'){
         if ( isNumeric(sNode.value) ) return true;
         return false;
@@ -255,7 +262,7 @@ function evaluateNodes(op: string, sA: SExpression, sB: SExpression):SExpression
         }
         let lA = sA.type==='Cons'&& sA.value === '-'? '-'+sA.rest[0].value  : sA.value;
         let lB = sB.type==='Cons'&& sB.value === '-'? '-'+sB.rest[0].value  : sB.value;
-        let res = parseInt(lA) + parseInt(lB);
+        let res = parseInt(lA) * parseInt(lB);
         if (res >= 0)
             return { type:'Atom', value: res.toString() };
         else
