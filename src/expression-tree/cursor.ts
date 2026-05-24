@@ -55,12 +55,16 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
      && zipper.root.value === '='            // Only allow if this tree is an equation
      && ( ['+', '-', '=', '*', 'inv'].includes( zipper.selected.parent.value ) )
      && zipper.selected.parent.value !== '-'
-     && !( zipper.selected.parent.value === '*' && mode === 'plus'  )  // mode mismatch
-     && !( zipper.selected.parent.value === '+' && mode === 'mult'  )
-     ){
+     ){ if ( ( zipper.selected.parent.value === '*' && mode === 'plus'  )  // mode mismatch
+            || ( zipper.selected.parent.value === '+' && mode === 'mult'  )){
+            console.log("Mode mismatch. Cannot move terms.");
+            resetSelected(); return false; }
         console.log("Move terms across equation")
         // Put this unnecessarily check to shut ts compiler up
         if (zipper.root.type === 'Atom' || zipper.selected.parent.type === 'Atom'){ 
+            resetSelected(); return false; }
+        if (zipper.selected.self.value === '0'){ 
+            console.log("Cannot move 0.")
             resetSelected(); return false; }
         //let lhsBranch = zipper.root.rest[0];
         //let rhsBranch = zipper.root.rest[1];
@@ -78,17 +82,13 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         //let pushOp = focus.value
         let currentCrumb = zipper.path.at(-1)!;
         let invertOp = mode === 'plus' ? '-' : 'inv'
-        // Move and add PLUS/MINUS operator to the top of the other side
         // Invert selected node
-        if (selectedNode.type === 'Atom' || selectedNode.value === '+' ){
+        if (selectedNode.type === 'Atom' || ['+','*'].includes( selectedNode.value) ){
             selectedNode = insertOpAtTop(zipper.selectedPath.at(-1)!, null, selectedIndex, invertOp)!;
-        }else if (selectedNode.value === '-')  {
-            selectedNode = removeOpAtTop(zipper.selectedPath.at(-1)!, selectedIndex);
-        }else if (selectedNode.value === '*')  {
-            selectedNode = insertOpAtTop(zipper.selectedPath.at(-1)!, null, selectedIndex, invertOp)!;
-        }else if (selectedNode.value === 'inv'){
+        }else if ( ['-','inv'].includes( selectedNode.value) )  {
             selectedNode = removeOpAtTop(zipper.selectedPath.at(-1)!, selectedIndex);
         }
+        // Move and add PLUS/MINUS operator to the top of the other side
         if ((focus.type !== 'Atom') && ((focus.value === '+' && mode === 'plus') || (focus.value === '*' && mode === 'mult'))   )
             focus.rest.push(selectedNode);
         else{
@@ -139,7 +139,7 @@ function removeOpAtTop(crumb: Crumb, childIndex: number): SExpression{
     crumb.parent.rest[childIndex] = res
     return res;
 }
-// Gemini version
+// Simply Tree after a tranformation (Gemini version)
 export function simplifyTree(sNode: SExpression): SExpression {
     function simplifyHelper(sNode: SExpression): SExpression {
         // Base case: Atoms cannot be simplified further
