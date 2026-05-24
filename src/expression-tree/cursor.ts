@@ -10,6 +10,7 @@ function swap(arr: any[], i: number, j: number){
 
 type EquationZipper = Zipper & {
     root: Omit<Cons, 'value'> & { value: '=' } ;
+    select: Crumb
 };
 // Check canMoveTermAcross rules and use the EquationZipper type to shut TS compiler up
 function assertValidMove(zipper: Zipper, mode: 'plus' | 'mult'): asserts zipper is EquationZipper {
@@ -39,6 +40,9 @@ function assertValidMove(zipper: Zipper, mode: 'plus' | 'mult'): asserts zipper 
         
     // ... add the rest of your checks here
 }
+function fakeAssertValidMove(zipper: Zipper, mode: 'plus' | 'mult'): asserts zipper is EquationZipper{
+
+};
 
 // Function to execute when SPACE is pressed
 export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boolean{
@@ -61,9 +65,34 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
     // console.log("selected:", formatS(zipper.selected.parent), "\nfocus:", formatS(zipper.path.at(-1)!.parent) );
     if (zipper.selected.self === zipper.focus ){
         console.log("Don't swap with yourself");
-    } else if (zipper.selected.parent === zipper.focus){
-        
-        console.log("Don't swap with your parent");
+    } 
+    // Swap with parent
+    else if (zipper.selected.parent === zipper.focus){
+        console.log("sel, focus",zipper.selected.self.value,zipper.focus.value )
+        let currentCrumb = zipper.path.at(-1)!;
+        // If same comm-operator, flatten brackets
+        if ( (zipper.selected.self.value === '+' && zipper.focus.value === '+') 
+            || (zipper.selected.self.value === '*' && zipper.focus.value === '*')  ){
+            //currentCrumb.parent.rest[focusIndex] = zipper.selected.self
+            let selected = zipper.selected; if (selected.self.type==='Atom')return false;
+            zipper.focus.rest = [...selected.leftSiblings, ...selected.self.rest, ...selected.rightSiblings.reverse() ]
+            resetSelected();  return true;
+        } 
+        let selectedIndex = zipper.selected.leftSiblings.length;
+        let focusIndex = zipper.path.at(-1)!.leftSiblings.length;
+        // Double Negation elimination
+        if (zipper.selected.self.value === '-' && zipper.focus.value === '-') {
+            if (zipper.selected.self.type==='Atom')return false;
+            currentCrumb.parent.rest[focusIndex] = zipper.selected.self.rest[0]
+            resetSelected();  return true;
+        }
+        if ( !(zipper.selected.self.value === '+' && zipper.focus.value === '*') ){
+            console.log("No bracket to expand.");
+            resetSelected();  return false;
+        }
+        // Expand brackets: (* A (+ B C)) => (+ (* A B) (* A C))
+        // TODO
+
     }
     // SWAP SIBLINGS: Same parent means the two nodes are siblings
     else if (zipper.selected.parent === zipper.path.at(-1)!.parent && zipper.selected.parent.value !== '=' ){
@@ -74,22 +103,40 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         }
         let selectedIndex = zipper.selected.leftSiblings.length;
         let focusIndex = zipper.path.at(-1)!.leftSiblings.length;
+        let currentCrumb = zipper.path.at(-1)!;
         // Auto evaluate num literals
         if ( isNumLiteral(zipper.selected.self) && isNumLiteral(zipper.focus) ){
-            let currentCrumb = zipper.path.at(-1)!;
             if( zipper.root.type==='Atom')return false;
             let op = mode === 'plus' ? '+' : '*'
             let res = evaluateNodes(op, zipper.focus, zipper.selected.self);
             console.log("Eval to:", res?.value)
             currentCrumb.parent.rest[focusIndex] = res!;
             // Delete original selected node
-            zipper.selected.parent.rest.splice(selectedIndex,1);
-            if ( zipper.root.rest.length < 2 ){  // Insert 0 if a side is empty
-                zipper.root.rest.splice( selectedIndex, 0, {type: 'Atom', value: mode === 'plus' ? '0' : '1'} );
-            }
+            removeNode(zipper, mode);
             resetSelected();
             return true;
         }
+        // Additive / Multiplicative inverse annihilation
+        if ( zipper.focus.type !== 'Atom' && ['-','inv'].includes(zipper.focus.value) ){
+            let selectedStr = formatS(zipper.selected.self); let focusStr=formatS(zipper.focus.rest[0]);
+            if (selectedStr === focusStr ){
+                // removeOpAtTop(currentCrumb, focusIndex);
+                // removeNode(zipper, selectedIndex, mode);
+                let siblings = zipper.selected.parent.rest;
+                const largerIndex = Math.max(selectedIndex, focusIndex);
+                const smallerIndex = Math.min(selectedIndex, focusIndex);
+                if (zipper.focus.value === '-'){ // Delete both nodes
+                    siblings.splice(largerIndex, 1);
+                    siblings.splice(smallerIndex, 1);
+                } else{   // 'inv'
+                    currentCrumb.parent.rest[focusIndex] = {type:'Atom', value:'1'};
+                    removeNode(zipper, mode);
+                }
+                resetSelected();  return true;
+            }
+        }
+        
+
         // Swap selected node with current node
         let sNode = zipper.selected.parent
         swap(sNode.rest, selectedIndex, focusIndex);
@@ -145,18 +192,12 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
             //else if (focus.value === '/')
              //   insertOpAtTop(currentCrumb, selectedNode, focusIndex, '*')
         }
-
         // zipper.focus =  {type: 'Cons', value: '+', rest: [focus, selectedNode]} ;
         // Delete original selected node
-        zipper.selected.parent.rest.splice(selectedIndex,1);
-        if ( zipper.root.rest.length < 2 ){  // Insert 0 if a side is empty
-            zipper.root.rest.splice( selectedIndex, 0, {type: 'Atom', value: mode === 'plus' ? '0' : '1'} );
-        }
+        removeNode(zipper, mode);
         // console.log("left:", zipper.selected.parent.rest)
         // if (zipper.root.rest.length < 2)  // No terms left at a side after moving
         //     zipper.root.rest.splice( focusIndex ,0, {type: 'Atom', value: '0'}  )
-        zipper.goUp();
-        zipper.goDown(focusIndex);
         isSimplifyTree = true;
     }
     else{
@@ -168,6 +209,16 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
 }
 
 // Helper for mutating S Expression
+function removeNode(zipper: Zipper, mode:'plus'|'mult'){
+    let selectedIndex = zipper.selected!.leftSiblings.length;
+    if (zipper.selected === null) return;
+    fakeAssertValidMove(zipper, mode);
+    zipper.selected.parent.rest.splice(selectedIndex,1);
+    if ( zipper.root.rest.length < 2 ){  // Insert 0 if a side is empty
+        zipper.root.rest.splice( selectedIndex, 0, {type: 'Atom', value: mode === 'plus' ? '0' : '1'} );
+    }
+}
+
 // given A,B, construct (+ A B) and redirect the pointers of parents (childIndex means being the n-th child)
 function insertOpAtTop(crumb: Crumb, newTerm: SExpression |null, childIndex: number, op = '+'): SExpression{
     let res: SExpression;
