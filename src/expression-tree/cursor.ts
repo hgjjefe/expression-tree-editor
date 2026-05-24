@@ -1,4 +1,3 @@
-import { re, smaller } from 'mathjs';
 import { type SExpression, formatS } from './parser';
 import { Zipper, type Crumb } from './zipper'
 
@@ -8,6 +7,21 @@ function swap(arr: any[], i: number, j: number){
         console.log("Cant swap elements. Index out of range."); return; }
     [arr[i], arr[j]] = [arr[j], arr[i]];
 }
+
+// type ValidEquationZipper = Zipper & {
+//     root.type = 'Cons';
+//     selected: Crumb & { parent: Cons; self: SExpression };
+//     path: Crumb[];
+// };
+
+// function assertValidMove(zipper: Zipper, mode: 'plus' | 'mult'): asserts zipper is ValidatedEquationZipper {
+//     if (zipper.root.type === 'Atom' || zipper.root.value !== '=') throw new Error();
+//     if (!zipper.selected || zipper.selected.parent.type === 'Atom') throw new Error();
+    
+//     const parentValue = zipper.selected.parent.value;
+//     if (parentValue === '*' && mode === 'plus') throw new Error();
+//     // ... add the rest of your checks here
+// }
 
 // Function to execute when SPACE is pressed
 export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boolean{
@@ -31,6 +45,7 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
     if (zipper.selected.self === zipper.focus ){
         console.log("Don't swap with yourself");
     } else if (zipper.selected.parent === zipper.focus){
+        
         console.log("Don't swap with your parent");
     }
     // SWAP SIBLINGS: Same parent means the two nodes are siblings
@@ -40,9 +55,25 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
             resetSelected();
             return false;
         }
-        // Swap selected node with current node
         let selectedIndex = zipper.selected.leftSiblings.length;
         let focusIndex = zipper.path.at(-1)!.leftSiblings.length;
+        // Auto evaluate num literals
+        if ( isNumLiteral(zipper.selected.self) && isNumLiteral(zipper.focus) ){
+            let currentCrumb = zipper.path.at(-1)!;
+            if(currentCrumb.parent.type==='Atom' || zipper.root.type==='Atom'||zipper.selected.parent.type==='Atom')return false;
+            let op = mode === 'plus' ? '+' : '*'
+            let res = evaluateNodes(op, zipper.focus, zipper.selected.self);
+            console.log("Eval to:", res?.value)
+            currentCrumb.parent.rest[focusIndex] = res!;
+            // Delete original selected node
+            zipper.selected.parent.rest.splice(selectedIndex,1);
+            if ( zipper.root.rest.length < 2 ){  // Insert 0 if a side is empty
+                zipper.root.rest.splice( selectedIndex, 0, {type: 'Atom', value: mode === 'plus' ? '0' : '1'} );
+            }
+            resetSelected();
+            return true;
+        }
+        // Swap selected node with current node
         let sNode = zipper.selected.parent
         if (sNode.type === 'Atom') return false;
         swap(sNode.rest, selectedIndex, focusIndex);
@@ -95,7 +126,8 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         //let pushOp = focus.value
 
         let invertOp = mode === 'plus' ? '-' : 'inv'
-        // Invert selected node
+        // ======= Transformation starts here =======
+        // INVERT selected node
         if (selectedNode.type === 'Atom' || ['+','*'].includes( selectedNode.value) ){
             selectedNode = insertOpAtTop(zipper.selectedPath.at(-1)!, null, selectedIndex, invertOp)!;
         }else if ( ['-','inv'].includes( selectedNode.value) )  {
