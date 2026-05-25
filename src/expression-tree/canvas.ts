@@ -117,7 +117,7 @@ function init() {
     
     expressionInput.value = SAMPLE_EXPRESSIONS[Math.floor(Math.random() * SAMPLE_EXPRESSIONS.length)]
     expressionInput.value = "(a - b) * (c + d) / z=t";
-    expressionInput.value = "a + 3 = 5"
+    expressionInput.value = "a * (3+7)*b = 5"
     setTimeout(() => {
         document.getElementById('generate-tree')!.click();
         // Add keyboard key detection for cursor control

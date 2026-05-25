@@ -1,3 +1,4 @@
+import { re } from 'mathjs';
 import { type SExpression, formatS, type Atom, type Cons } from './parser';
 import { Zipper, type Crumb } from './zipper'
 
@@ -68,31 +69,51 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
     } 
     // Swap with parent
     else if (zipper.selected.parent === zipper.focus){
-        console.log("sel, focus",zipper.selected.self.value,zipper.focus.value )
+        //console.log("sel, focus",zipper.selected.self.value,zipper.focus.value )
         let currentCrumb = zipper.path.at(-1)!;
+        let focusIndex = zipper.path.at(-1)!.leftSiblings.length;
         // If same comm-operator, flatten brackets
         if ( (zipper.selected.self.value === '+' && zipper.focus.value === '+') 
             || (zipper.selected.self.value === '*' && zipper.focus.value === '*')  ){
             //currentCrumb.parent.rest[focusIndex] = zipper.selected.self
             let selected = zipper.selected; if (selected.self.type==='Atom')return false;
-            zipper.focus.rest = [...selected.leftSiblings, ...selected.self.rest, ...selected.rightSiblings.reverse() ]
-            resetSelected();  return true;
+            zipper.focus.rest = [...selected.leftSiblings, ...selected.self.rest, ...selected.rightSiblings.reverse() ];
+            zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
+            zipper.goDown(focusIndex);
+            resetSelected();  return false;
         } 
         let selectedIndex = zipper.selected.leftSiblings.length;
-        let focusIndex = zipper.path.at(-1)!.leftSiblings.length;
+
         // Double Negation elimination
         if (zipper.selected.self.value === '-' && zipper.focus.value === '-') {
             if (zipper.selected.self.type==='Atom')return false;
             currentCrumb.parent.rest[focusIndex] = zipper.selected.self.rest[0]
-            resetSelected();  return true;
+            zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
+            zipper.goDown(focusIndex);
+            resetSelected();  return false;
         }
         if ( !(zipper.selected.self.value === '+' && zipper.focus.value === '*') ){
             console.log("No bracket to expand.");
             resetSelected();  return false;
-        }
+        } else if (zipper.selected.self.type==='Atom')return false // SHUT UP
         // Expand brackets: (* A (+ B C)) => (+ (* A B) (* A C))
-        // TODO
-
+        let resultTerms: SExpression[] = [];
+        for (let childNode of zipper.selected.self.rest) {
+            let reversedRight = [...zipper.selected.rightSiblings].reverse();
+            // Deep clone the siblings so they occupy completely separate memory addresses
+            let clonedLeft = zipper.selected.leftSiblings.map(node => structuredClone(node));
+            let clonedRight = reversedRight.map(node => structuredClone(node));
+            // If childNode is an object, deep clone it too just to be completely safe!
+            let clonedChild = structuredClone(childNode);
+            let resultTerm = {
+                type: 'Cons', 
+                value: '*', 
+                rest: [...clonedLeft, clonedChild, ...clonedRight] 
+            } satisfies Cons;
+            resultTerms.push(resultTerm);
+        }
+        zipper.focus.rest = resultTerms;
+        zipper.focus.value = '+';
     }
     // SWAP SIBLINGS: Same parent means the two nodes are siblings
     else if (zipper.selected.parent === zipper.path.at(-1)!.parent && zipper.selected.parent.value !== '=' ){
@@ -135,7 +156,6 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
                 resetSelected();  return true;
             }
         }
-        
 
         // Swap selected node with current node
         let sNode = zipper.selected.parent
