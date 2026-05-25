@@ -64,10 +64,15 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
     // ===================
     // DESELECT NODE (if currently have selected some node)
     // console.log("selected:", formatS(zipper.selected.parent), "\nfocus:", formatS(zipper.path.at(-1)!.parent) );
+    let focusIndex = zipper.path.at(-1)!.leftSiblings.length;
     if (zipper.selected.self === zipper.focus ){
         console.log("Don't swap with yourself");
-    } 
-    // Swap with parent
+        // test
+        // let non = nonNumLiteralTerm(zipper.focus)
+        // zipper.focus = non;
+        // zipper.selected.parent.rest[focusIndex] = non;
+    }  
+    // SWAP WITH PARENT
     else if (zipper.selected.parent === zipper.focus){
         //console.log("sel, focus",zipper.selected.self.value,zipper.focus.value )
         let currentCrumb = zipper.path.at(-1)!;
@@ -92,10 +97,24 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
             zipper.goDown(focusIndex);
             resetSelected();  return false;
         }
+        // Bracket negative brackets -(A+B)  => -A + -B
+        if (zipper.selected.self.value === '+' && zipper.focus.value === '-') {
+            if (zipper.selected.self.type==='Atom')return false;
+            currentCrumb.parent.rest[focusIndex] = zipper.selected.self;
+            zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
+            zipper.goDown(focusIndex);
+            for (let i=0;i<zipper.selected.self.rest.length; i++){
+                let childNode = zipper.selected.self.rest[i];
+                childNode = {type: 'Cons', value: '-', rest: [childNode] };
+                zipper.selected.self.rest[i] = childNode;
+            }
+            resetSelected();  return false;
+        }
+
         if ( !(zipper.selected.self.value === '+' && zipper.focus.value === '*') ){
             console.log("No bracket to expand.");
             resetSelected();  return false;
-        } else if (zipper.selected.self.type==='Atom')return false // SHUT UP
+        }  if (zipper.selected.self.type==='Atom')return false // SHUT UP
         // Expand brackets: (* A (+ B C)) => (+ (* A B) (* A C))
         let resultTerms: SExpression[] = [];
         for (let childNode of zipper.selected.self.rest) {
@@ -115,6 +134,16 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         zipper.focus.rest = resultTerms;
         zipper.focus.value = '+';
     }
+    // SWAP WITH GRANDPARENT: -1 extraction in '*'s negative children
+    else if (zipper.selectedPath.length >=2 && zipper.selectedPath.at(-2)!.parent === zipper.focus
+    && zipper.focus.value === '*' && zipper.selected.parent.value === '-'
+    ){
+        console.log("Grandpa!")
+        let leftUncles = zipper.selectedPath.at(-2)!.leftSiblings;
+        zipper.focus.rest.splice(leftUncles.length+1,0,zipper.selected.self)
+        zipper.selected.parent.rest[0] = {type: 'Atom', value: '1'};
+    }
+
     // SWAP SIBLINGS: Same parent means the two nodes are siblings
     else if (zipper.selected.parent === zipper.path.at(-1)!.parent && zipper.selected.parent.value !== '=' ){
         if ( ! ['+', '*'].includes(zipper.selected.parent.value) ){
@@ -125,10 +154,10 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         let selectedIndex = zipper.selected.leftSiblings.length;
         let focusIndex = zipper.path.at(-1)!.leftSiblings.length;
         let currentCrumb = zipper.path.at(-1)!;
-        // Auto evaluate num literals
-        if ( isNumLiteral(zipper.selected.self) && isNumLiteral(zipper.focus) ){
+        // Auto evaluate num literals if in plus mode
+        if ( isNumLiteral(zipper.selected.self) && isNumLiteral(zipper.focus)&& mode==='plus'){
             if( zipper.root.type==='Atom')return false;
-            let op = mode === 'plus' ? '+' : '*'
+            let op = zipper.selected.parent.value
             let res = evaluateNodes(op, zipper.focus, zipper.selected.self);
             console.log("Eval to:", res?.value)
             currentCrumb.parent.rest[focusIndex] = res!;
@@ -156,6 +185,26 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
                 resetSelected();  return true;
             }
         }
+        // Combine like terms
+        if (zipper.selected.parent.value ==='+' && mode == 'plus' &&
+            !isNumLiteral(zipper.selected.self) && !isNumLiteral(zipper.focus)
+           && getCoefficient(zipper.selected.self) && getCoefficient(zipper.focus) ){
+            let nonNumLitSelected = nonNumLiteralFactor(zipper.selected.self)!;
+            let nonNumLitFocus = nonNumLiteralFactor(zipper.focus)!;
+            //console.log("formatS:", formatS(nonNumLitSelected), formatS(nonNumLitFocus))
+            if ( formatS(nonNumLitSelected) == formatS(nonNumLitFocus) ){
+                let coeSelected = getCoefficient(zipper.selected.self)!;
+                let coeFocus = getCoefficient(zipper.focus)!;
+                let resCoe = evaluateNodes('+', coeSelected, coeFocus);
+                let resNonNumLit = nonNumLitFocus.type==='Atom'? [nonNumLitFocus]: nonNumLitFocus.rest;
+                currentCrumb.parent.rest[focusIndex] = {type:'Cons',
+                    value: '*', rest: [ resCoe!, ...resNonNumLit ]
+                }
+                removeNode(zipper, mode);
+                resetSelected();  return true;
+            }
+        }
+
 
         // Swap selected node with current node
         let sNode = zipper.selected.parent
@@ -360,6 +409,41 @@ function evaluateNodes(op: string, sA: SExpression, sB: SExpression):SExpression
         else
             return { type:'Cons', value: '-', rest: [ {type:'Atom', value:(-res).toString()}] };
 
+}
+// Get the subtree excluding any number literals
+function nonNumLiteralFactor(sNode: SExpression): SExpression|null{
+    if (sNode.type === 'Atom'){
+        if (!isNumLiteral(sNode)) return sNode;
+        return null;
+    } 
+    if (sNode.value === '-') return nonNumLiteralFactor(sNode.rest[0]);
+    if (sNode.value === '*'){
+        let res = sNode.rest.filter( (s) => !isNumLiteral(s) );
+        if (res.length ===0) return null;
+        if (res.length ===1) return res[0];
+        return { type: 'Cons', value: sNode.value, rest: res};
+    }
+    return sNode;
+}
+// Get a single number literal factor only
+function getCoefficient(sNode: SExpression, negated:boolean= false):SExpression|null {
+    if (sNode.type === 'Atom'){
+        if (isNumLiteral(sNode)){
+            if (!negated) return sNode;
+            return {type:'Cons', value:'-', rest: [sNode]};
+        } 
+        if (!negated) return { type:'Atom', value:'1'};
+        return { type:'Cons', value:'-', rest:[{ type:'Atom', value:'1'}]};
+    } 
+    if (sNode.value === '-'){
+        return getCoefficient(sNode.rest[0], !negated);
+    }
+    if (sNode.value === '*'){
+        let res = sNode.rest.filter( (s) => isNumLiteral(s) );
+        if (res.length !== 1) return null;
+        return (!negated)? res[0] : {type:'Cons', value:'-', rest:[res[0]]};
+    }
+    return null;
 }
 
 

@@ -113,13 +113,17 @@ function init() {
     document.getElementById('randomize')!.addEventListener('click', randomizeExpression);
     document.getElementById('canonicalize')!.addEventListener('click', ()=> { generateTree(true) });
     window.addEventListener('resize', render);
-    window.addEventListener('keydown', (e)=> { if (e.code==='KeyR') document.getElementById('canonicalize')!.click() } );
+    window.addEventListener('keydown', (e)=> { if (e.code==='KeyR'){
+        const target = e.target as HTMLElement;
+        if ( target.tagName === "INPUT" || target.tagName === "TEXTAREA" ||target.isContentEditable) { return; }
+        e.preventDefault();  document.getElementById('canonicalize')!.click();
+    }  } );
     
     expressionInput.value = SAMPLE_EXPRESSIONS[Math.floor(Math.random() * SAMPLE_EXPRESSIONS.length)]
     expressionInput.value = "(a - b) * (c + d) / z=t";
-    expressionInput.value = "a * (3+7)*b = 5"
+    expressionInput.value = " 5*a - 2*a = 5"
     setTimeout(() => {
-        document.getElementById('generate-tree')!.click();
+        document.getElementById('canonicalize')!.click();
         // Add keyboard key detection for cursor control
         if (currentRoot !== null){
             window.addEventListener('keydown', (event)=> {
