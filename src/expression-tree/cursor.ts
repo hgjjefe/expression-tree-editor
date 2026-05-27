@@ -182,7 +182,7 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
             if( zipper.root.type==='Atom')return false;
             let op = zipper.selected.parent.value
             let res = evaluateNodes(op, zipper.focus, zipper.selected.self);
-            console.log("Eval to:", res?.value)
+            console.log("Eval to:", formatS(res))
             currentCrumb.parent.rest[focusIndex] = res!;
             // Delete original selected node
             removeNode(zipper, mode);
@@ -368,7 +368,7 @@ function removeOpAtTop(crumb: Crumb, childIndex: number): SExpression{
     return res;
 }
 function isNumeric(str: string): boolean{
-    return /^\d+$/.test(str);
+    return /^\d+(\.\d+)?$/.test(str);
 }
 // Check if node is in the form [number] or [-] -> [number]
 function isNumLiteral(sNode: SExpression): boolean{
@@ -376,9 +376,21 @@ function isNumLiteral(sNode: SExpression): boolean{
         if ( isNumeric(sNode.value) ) return true;
         return false;
     }
+    // Also accepts (inv m)
+    if (sNode.value === 'inv'){
+        return isNumeric(sNode.rest[0].value);
+    }  
+    // Not accept Rationals for now (* n (inv m))
+    // if (sNode.value === '*'){
+    //     if (sNode.rest.length !== 2) return false;
+    //     if ( !isNumeric(sNode.rest[0].value)) return false;
+    //     if ( sNode.rest[1].type === 'Atom' ) return false;
+    //     if ( sNode.rest[1].value !== 'inv') return false;
+    //     if ( !isNumeric(sNode.rest[1].rest[0].value) ) return false;
+    //     return true;
+    // }
     if ( sNode.value !== '-'  ) return false;
-    if ( isNumeric(sNode.rest[0].value)) return true;
-    return false;
+    return isNumeric( sNode.rest[0].value );
 }
 
 
@@ -435,6 +447,14 @@ export function simplifyTree(sNode: SExpression): SExpression {
 
     return simplifyHelper(sNode);
 }
+// Turn num literal node into a number type
+function parseNumLiteral(sNode: SExpression): number|null{
+    if ( !isNumLiteral(sNode) ) return null;
+    if ( sNode.type === 'Atom' ) return Number(sNode.value);
+    if (sNode.value === '-' ) return -Number(sNode.rest[0].value);
+    if (sNode.value === 'inv') return 1/Number(sNode.rest[0].value);
+    return null
+}
 
 // Evaluate two number node literals into a single node literal (i.e. a number node or negated number node)
 function evaluateNodes(op: string, sA: SExpression, sB: SExpression):SExpression|null{
@@ -444,29 +464,26 @@ function evaluateNodes(op: string, sA: SExpression, sB: SExpression):SExpression
     }
     let vA = sA.value; let vB = sB.value;
     // Reject if node value is neither a number or NEG
-    if ( !isNumeric(vA) && vA !== '-' || !isNumeric(vB) && vB !== '-' ){
+    if ( !isNumeric(vA) && !['-','inv'].includes(vA) || !isNumeric(vB) && !['-','inv'].includes(vB) ){
         console.log("Cant operate non-numbers for now"); return null;
     }
     if (op === '+'){
-        let lA = sA.type==='Cons'&& sA.value === '-'? '-'+sA.rest[0].value  : sA.value;
-        let lB = sB.type==='Cons'&& sB.value === '-'? '-'+sB.rest[0].value  : sB.value;
-        let res = parseInt(lA) + parseInt(lB);
+        let lA = parseNumLiteral(sA)!;
+        let lB = parseNumLiteral(sB)!;
+        let res = lA + lB;
+        console.log('AB', lA, lB)
         if (res >= 0)
             return { type:'Atom', value: res.toString() };
         else
-            return { type:'Cons', value: '-', rest: [ {type:'Atom', value:(-res).toString()}] };
+            return { type:'Cons', value: '-', rest: [ {type:'Atom', value:parseFloat((-res).toFixed(4)).toString()}] };
     } // else '*'
-        // Currently dont support fractions
-        if (sA.type==='Cons'&& sA.value === 'inv' || sB.type==='Cons'&& sB.value === 'inv'){
-            return null;
-        }
-        let lA = sA.type==='Cons'&& sA.value === '-'? '-'+sA.rest[0].value  : sA.value;
-        let lB = sB.type==='Cons'&& sB.value === '-'? '-'+sB.rest[0].value  : sB.value;
-        let res = parseInt(lA) * parseInt(lB);
+        let lA = parseNumLiteral(sA)!;
+        let lB = parseNumLiteral(sB)!;
+        let res = lA * lB;
         if (res >= 0)
             return { type:'Atom', value: res.toString() };
         else
-            return { type:'Cons', value: '-', rest: [ {type:'Atom', value:(-res).toString()}] };
+            return { type:'Cons', value: '-', rest: [ {type:'Atom', value:parseFloat((-res).toFixed(4)).toString()}] };
 
 }
 // Get the subtree excluding any number literals
