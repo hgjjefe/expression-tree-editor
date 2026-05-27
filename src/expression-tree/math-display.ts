@@ -1,6 +1,5 @@
 import { type SExpression  } from "./parser";
 import { getInfixBP, getPrefixBP, getPostfixBP, PREFIX_BINDING_POWERS } from "./binding-powers";
-import { num } from "mathjs";
 
 export function displayS(sNode: SExpression): string {
     // SExpression -> [Sstring, op, 'pre'|'in'|'post']

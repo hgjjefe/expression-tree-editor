@@ -1,4 +1,3 @@
-import { re, zeros } from 'mathjs';
 import { type SExpression, formatS, type Atom, type Cons } from './parser';
 import { Zipper, type Crumb } from './zipper'
 
@@ -21,7 +20,12 @@ function assertValidMove(zipper: Zipper, mode: 'plus' | 'mult'): asserts zipper 
     const parentValue = zipper.selected.parent.value;
     if (parentValue === '*' && mode === 'plus' || parentValue === '+' && mode === 'mult') 
         throw new Error("Mode mismatches selected node. Cannot move terms.");
-    let currentCrumb = zipper.path.at(-1)!;      
+    // If selectedNode is level 3 then parent must be '*' and grandparent must be '-'
+    if (zipper.selectedPath.length === 3){
+        if (zipper.selected.parent.value !== '*' || zipper.selectedPath.at(-2)!.parent.value!=='-' )
+            throw new Error("Cant move level 3 selected node that is not a factor of negative term.")
+    }
+    let currentCrumb = zipper.path.at(-1)!;
     // If focus is level 2 then it must be numLiteral and parent must be '+' or '*'
     if ( zipper.path.length === 2  ){
         if (!['+','*'].includes(currentCrumb.parent.value)|| !isNumLiteral(zipper.focus) ){
@@ -115,13 +119,23 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
             }
             resetSelected();  return false;
         }
-        // Push negatve outside factor  a*-b  => -(a*b)
+        // Pull out negatve outside factor:  a*-b  => -(a*b)
         if (zipper.selected.self.value === '-' && zipper.focus.value === '*'){
             if (zipper.selected.self.type==='Atom')return false;
             zipper.focus.rest[selectedIndex] = zipper.selected.self.rest[0];
             insertOpAtTop(currentCrumb, null, null, '-');
             zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
             zipper.goDown(focusIndex);
+            resetSelected();  return false;
+        }
+        // Pull out negatve outside inv: inv(-b)  => -inv(b)
+        if (zipper.selected.self.value === '-' && zipper.focus.value === 'inv'){
+            if (zipper.selected.self.type==='Atom')return false;
+            zipper.focus.rest[selectedIndex] = zipper.selected.self.rest[0];
+            insertOpAtTop(currentCrumb, null, null, '-');
+            zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
+            zipper.goDown(focusIndex);
+            resetSelected();  return false;
         }
 
         // Unflatten out one term in '+' or '*' node with 3 or more terms (in mult mode)
@@ -241,7 +255,7 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
     }  
     // FACTOR OUT COMMON FACTORS (cousin or uncle being the same atom)
     else if (isFactorizable(zipper)){
-        console.log("FACTORIZE");
+        console.log("FACTORIZE:", formatS(zipper.focus));
         let currentCrumb = zipper.path.at(-1)!;
         let focusIndex = zipper.path.at(-1)!.leftSiblings.length;
         let selectedIndex = zipper.selected.leftSiblings.length;
@@ -275,7 +289,7 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
     }
 
     // MOVE TERM to opposite side of equation
-    else if (zipper.selectedPath.length <= 2 && zipper.path.length <= 2 // Only allow move top-2 layer
+    else if (zipper.selectedPath.length <= 3 && zipper.path.length <= 2 // Only allow move top-2 layer
      && zipper.root.value === '='            // Only allow if this tree is an equation
      && ( ['+', '=', '*'].includes( zipper.selected.parent.value ) )  
      ){   // Check canMoveTermAcross conditions
@@ -371,7 +385,7 @@ function isNumeric(str: string): boolean{
     return /^\d+(\.\d+)?$/.test(str);
 }
 // Check if node is in the form [number] or [-] -> [number]
-function isNumLiteral(sNode: SExpression): boolean{
+export function isNumLiteral(sNode: SExpression): boolean{
     if (sNode.type === 'Atom'){
         if ( isNumeric(sNode.value) ) return true;
         return false;
@@ -470,24 +484,27 @@ function evaluateNodes(op: string, sA: SExpression, sB: SExpression):SExpression
     if (op === '+'){
         let lA = parseNumLiteral(sA)!;
         let lB = parseNumLiteral(sB)!;
-        let res = lA + lB;
-        console.log('AB', lA, lB)
+        let res:number|string = lA + lB;
+        res = snapToInteger( parseFloat( res.toFixed(10)));
+        //console.log('AB', lA, lB)
         if (res >= 0)
             return { type:'Atom', value: res.toString() };
         else
-            return { type:'Cons', value: '-', rest: [ {type:'Atom', value:parseFloat((-res).toFixed(4)).toString()}] };
+            return { type:'Cons', value: '-', rest: [ {type:'Atom', value: (-res).toString()}] };
     } // else '*'
         let lA = parseNumLiteral(sA)!;
         let lB = parseNumLiteral(sB)!;
-        let res = lA * lB;
+        let res:number|string = lA * lB;
+        res = snapToInteger(parseFloat(res.toFixed(10)));
+        //console.log('AB', lA, lB)
         if (res >= 0)
             return { type:'Atom', value: res.toString() };
         else
-            return { type:'Cons', value: '-', rest: [ {type:'Atom', value:parseFloat((-res).toFixed(4)).toString()}] };
+            return { type:'Cons', value: '-', rest: [ {type:'Atom', value: (-res).toString()}] };
 
 }
 // Get the subtree excluding any number literals
-export function nonNumLiteralFactor(sNode: SExpression): SExpression|null{
+function nonNumLiteralFactor(sNode: SExpression): SExpression|null{
     if (sNode.type === 'Atom'){
         if (!isNumLiteral(sNode)) return sNode;
         return null;
@@ -578,6 +595,16 @@ function printPath(path: Crumb[]){
     console.log("Path:", res.join(' ') )
 }
 
+// Round a number to integer if very close
+function snapToInteger(num: number, tol: number = 1e-8): number {
+    const nearestInt = Math.round(num);
+    // Check if the absolute distance is smaller than the tolerance
+    if (Math.abs(num - nearestInt) < tol) {
+        return nearestInt;
+    }
+    // Return the original number untouched if it's not close enough
+    return num;
+}
 
 
 /*

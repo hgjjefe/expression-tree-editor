@@ -6,18 +6,20 @@ import { parseExpression, formatS, type SExpression, canonicalize, grammarCheck 
 import { Lexer } from './lexer';
 import { displayS } from './math-display';
 import { Zipper } from './zipper';
-import { nonNumLiteralFactor, selectNode, simplifyTree, swap } from './cursor';
+import { isNumLiteral, selectNode, simplifyTree, swap } from './cursor';
 import { EQUATION_LEVELS } from './levels';
-import { exp, simplify } from 'mathjs';
 
 const canvas = document.querySelector('canvas') as HTMLCanvasElement;
 const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
 const expressionInput = document.getElementById('expression-input') as HTMLInputElement;
 const mathDisplay = document.getElementById('math-display');
+const levelSelect = document.getElementById('level-select') as HTMLSelectElement;
 let activeMode : 'old' | 'nary' = 'old';
 let currentSExpression : SExpression | null;
 let currentRoot: TreeNode | null;   // Current Visual Tree root
 let currentZipper: Zipper | null = null;
+let isWonLevel: boolean = false;
+let currentLevel: number = 0;
 
 function clearCanvas() { 
     ctx.clearRect(0, 0, canvas.width, canvas.height) }
@@ -43,6 +45,7 @@ function updateTree(isCanonicalize = false, newZipper = false){
         currentSExpression = canonicalize(currentSExpression!);
         printS(currentSExpression!); 
         grammarCheck(currentSExpression!);
+        isWonLevel = false;
     }
 
     if (currentZipper === null || newZipper)
@@ -53,8 +56,11 @@ function updateTree(isCanonicalize = false, newZipper = false){
                     (window as any).MathJax.typesetPromise([mathDisplay])
                         .catch((err: any) => console.log('MathJax typeset failed: ', err));
                 } 
-    // Check level win
-    if (checkLevelWin()) displayWinMessage();
+    // Check level win (only once)
+    if (!isWonLevel && checkLevelWin()){
+        displayWinMessage();
+        isWonLevel = true;
+    }
     render();
 }
 
@@ -125,6 +131,20 @@ function init() {
         if (currentZipper === null || currentZipper.root.type==='Atom') return;
         swap(currentZipper.root.rest, 0, 1);
         updateTree(false, true);
+    } else if (e.code === 'KeyL'){  // Go to next level
+        if (currentLevel === EQUATION_LEVELS.length - 3) return;
+        isWonLevel = false;
+        currentLevel += 1;
+        expressionInput.value = EQUATION_LEVELS.at(currentLevel)!;
+        document.getElementById('canonicalize')!.click();
+        levelSelect.value = currentLevel.toString();
+    }else if (e.code === 'KeyK'){  // Go to next level
+        if (currentLevel === 1) return;
+        isWonLevel = false;
+        currentLevel -= 1;
+        expressionInput.value = EQUATION_LEVELS.at(currentLevel)!;
+        document.getElementById('canonicalize')!.click();
+        levelSelect.value = currentLevel.toString();
     }
 
 } );
@@ -177,17 +197,24 @@ function init() {
         }
     }, 500);
     /* ====== LEVEL SELECTION ====== */
-    const levelSelect = document.getElementById('level-select') as HTMLSelectElement;
     levelSelect.addEventListener('change', (event) => {
         const selectedLevel = (event.target as HTMLSelectElement).value;
         if (selectedLevel === "") {
             return; 
         }
         let intLevel = parseInt(selectedLevel);
+        currentLevel = intLevel;
         console.log(`Switching to: ${selectedLevel}`);
-        expressionInput.value = EQUATION_LEVELS[intLevel];
+        isWonLevel = false;
+        expressionInput.value = EQUATION_LEVELS.at(currentLevel)!;
         document.getElementById('canonicalize')!.click();
     });
+    for (let i=1;i<EQUATION_LEVELS.length-2;i++){
+        const option = document.createElement('option');
+        option.value = i.toString();
+        option.textContent = `Level ${i}`;
+        levelSelect.appendChild(option);
+    }
 };
 init();
 
@@ -225,7 +252,7 @@ function checkLevelWin(): boolean{  // Only win if equation is in the form " x =
         || currentSExpression.type === 'Atom') return false;
     let lhs = currentSExpression.rest[0]; let rhs = currentSExpression.rest[1];
     if (lhs.type !== 'Atom' || !/^[a-zA-Z]$/.test(lhs.value) ) return false;
-    if (nonNumLiteralFactor(rhs) !== null) return false;
+    if ( !isNumLiteral(rhs)) return false;
     return true;
 }
 
