@@ -99,11 +99,47 @@
     transition: 0.4s linear;
     cursor: pointer;
   }
+ 
+#level-select {
+    width: 200px; /* Or use max-width: 220px; */
+    height: 64px;
+}
+.contact-section select {
+    margin-bottom: 20px;
+    outline: none;
+    background: none;
+    color: #fafafa;
+    border: 1px solid #e0e0e0;
+    padding: 15px 0px;
+    border-radius: 8px;
+    text-transform: uppercase;
+    font-size: 14px;
+    transition: 0.4s linear;
+    cursor: pointer;
+    
+    /* 1. Strip the default OS styling and dropdown arrow */
+    appearance: none; 
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    
+    /* 2. Center the text so it perfectly matches the buttons */
+    text-align: center;
+    text-align-last: center; 
+}
   
   .contact-section button:hover{
     background: #fafafa;
     color: #212121;
   }
+  .contact-section select:hover{
+    background: #fafafa;
+    color: #212121;
+  }
+  .contact-section select option {
+    color: #212121;            /* Forces the text to be dark grey/black */
+    background-color: #ffffff; /* Forces a solid white background for contrast */
+    text-transform: uppercase;
+}
 
   .ending-section{
       z-index: 10;

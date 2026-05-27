@@ -6,7 +6,8 @@ import { parseExpression, formatS, type SExpression, canonicalize, grammarCheck 
 import { Lexer } from './lexer';
 import { displayS } from './math-display';
 import { Zipper } from './zipper';
-import { selectNode, simplifyTree } from './cursor';
+import { nonNumLiteralFactor, selectNode, simplifyTree, swap } from './cursor';
+import { EQUATION_LEVELS } from './levels';
 import { exp, simplify } from 'mathjs';
 
 const canvas = document.querySelector('canvas') as HTMLCanvasElement;
@@ -52,6 +53,8 @@ function updateTree(isCanonicalize = false, newZipper = false){
                     (window as any).MathJax.typesetPromise([mathDisplay])
                         .catch((err: any) => console.log('MathJax typeset failed: ', err));
                 } 
+    // Check level win
+    if (checkLevelWin()) displayWinMessage();
     render();
 }
 
@@ -113,11 +116,18 @@ function init() {
     document.getElementById('randomize')!.addEventListener('click', randomizeExpression);
     document.getElementById('canonicalize')!.addEventListener('click', ()=> { generateTree(true) });
     window.addEventListener('resize', render);
-    window.addEventListener('keydown', (e)=> { if (e.code==='KeyR'){
+    window.addEventListener('keydown', (e)=> { 
+    if (e.code==='KeyR'){
         const target = e.target as HTMLElement;
         if ( target.tagName === "INPUT" || target.tagName === "TEXTAREA" ||target.isContentEditable) { return; }
         e.preventDefault();  document.getElementById('canonicalize')!.click();
-    }  } );
+    } else if (e.code === 'KeyE'){  // Swap both sides of equation
+        if (currentZipper === null || currentZipper.root.type==='Atom') return;
+        swap(currentZipper.root.rest, 0, 1);
+        updateTree(false, true);
+    }
+
+} );
     
     expressionInput.value = SAMPLE_EXPRESSIONS[Math.floor(Math.random() * SAMPLE_EXPRESSIONS.length)]
     expressionInput.value = "(a - b) * (c + d) / z=t";
@@ -133,6 +143,9 @@ function init() {
                         target.tagName === "TEXTAREA" || 
                         target.isContentEditable
                     ) { return; }
+                if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyF']
+                    .includes( event.code )
+                  ) return; 
                 switch (event.key){
                     case "ArrowDown":
                         event.preventDefault();
@@ -148,28 +161,39 @@ function init() {
                         event.preventDefault();
                         currentZipper.goRight(); break;
                 }
-                let isSimplyTree = false;
+                let isNewZipper = false;
                 switch (event.code){
                     case "Space":   // Select a node
                         event.preventDefault();
-                        isSimplyTree =  selectNode(currentZipper, 'plus');  break;
+                        isNewZipper =  selectNode(currentZipper, 'plus');  break;
                     case "KeyF":   // Select a node
                         event.preventDefault();
-                        isSimplyTree =  selectNode(currentZipper, 'mult');  break;
+                        isNewZipper =  selectNode(currentZipper, 'mult');  break;
                 }
-                if (isSimplyTree)
+                if (isNewZipper)
                     currentSExpression = simplifyTree(currentSExpression!);
-                updateTree(false, isSimplyTree);
+                updateTree(false, isNewZipper);
             })
         }
-    }, 500)
+    }, 500);
+    /* ====== LEVEL SELECTION ====== */
+    const levelSelect = document.getElementById('level-select') as HTMLSelectElement;
+    levelSelect.addEventListener('change', (event) => {
+        const selectedLevel = (event.target as HTMLSelectElement).value;
+        if (selectedLevel === "") {
+            return; 
+        }
+        let intLevel = parseInt(selectedLevel);
+        console.log(`Switching to: ${selectedLevel}`);
+        expressionInput.value = EQUATION_LEVELS[intLevel];
+        document.getElementById('canonicalize')!.click();
+    });
 };
 init();
 
 function printS(s: SExpression){
     console.log("S:", formatS(s));
 }
-
 
 function displayErrorMessage(message: string | undefined = undefined ) {
     let errorTitle = 'Syntax Error!'
@@ -195,3 +219,25 @@ function displayErrorMessage(message: string | undefined = undefined ) {
         footer: '<a href="https://github.com/lnogueir/expression-tree-gen">Learn more</a>'
     })
 }
+
+function checkLevelWin(): boolean{  // Only win if equation is in the form " x = Num "
+    if (currentSExpression === null || currentSExpression.value !== '=' 
+        || currentSExpression.type === 'Atom') return false;
+    let lhs = currentSExpression.rest[0]; let rhs = currentSExpression.rest[1];
+    if (lhs.type !== 'Atom' || !/^[a-zA-Z]$/.test(lhs.value) ) return false;
+    if (nonNumLiteralFactor(rhs) !== null) return false;
+    return true;
+}
+
+function displayWinMessage(){
+    Swal.fire({
+        icon: 'success',
+        title: 'You win the level!',
+        html: `
+            <div style="font-size:1.1em;text-align: left;margin:0px 0px 0px 60px;">
+                Good work! <br/>`
+    })
+}
+
+
+
