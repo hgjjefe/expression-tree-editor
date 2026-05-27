@@ -15,7 +15,10 @@ export interface Cons {
 }
 export type SExpression = Atom | Cons;
 
-export function formatS(node: SExpression): string {
+export function formatS(node: SExpression|null): string {
+  if (node === null){
+    return "Snull"
+  }
   switch (node.type) {
     case 'Atom':
       return node.value;

@@ -1,4 +1,4 @@
-import { re } from 'mathjs';
+import { re, zeros } from 'mathjs';
 import { type SExpression, formatS, type Atom, type Cons } from './parser';
 import { Zipper, type Crumb } from './zipper'
 
@@ -35,6 +35,11 @@ function assertValidMove(zipper: Zipper, mode: 'plus' | 'mult'): asserts zipper 
     // Cannot move 0 node for simplicity (otherwise you may create many duplicates of 0)
     if (zipper.selected.self.value === '0') 
         throw new Error("Cannot move 0.");
+    // Cant move to zero side in mult mode (to prevent 1=0 appearing)
+    if (zipper.focus.value === '0' && mode === 'mult'
+    && (zipper.selected.self.type==='Atom'||zipper.selected.self.value !== 'inv' ))
+        throw new Error("Cant move factor to zero side.");
+
     // Check if selected node and destination are different sides
     if (zipper.selectedPath[0].self === zipper.path[0].self) 
         throw new Error("Cant move terms to diffrent levels of same side");
@@ -191,12 +196,15 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
            && getCoefficient(zipper.selected.self) && getCoefficient(zipper.focus) ){
             let nonNumLitSelected = nonNumLiteralFactor(zipper.selected.self)!;
             let nonNumLitFocus = nonNumLiteralFactor(zipper.focus)!;
-            //console.log("formatS:", formatS(nonNumLitSelected), formatS(nonNumLitFocus))
+            console.log("formatS:", formatS(nonNumLitSelected), formatS(nonNumLitFocus))
             if ( formatS(nonNumLitSelected) == formatS(nonNumLitFocus) ){
                 let coeSelected = getCoefficient(zipper.selected.self)!;
                 let coeFocus = getCoefficient(zipper.focus)!;
                 let resCoe = evaluateNodes('+', coeSelected, coeFocus);
-                let resNonNumLit = nonNumLitFocus.type==='Atom'? [nonNumLitFocus]: nonNumLitFocus.rest;
+                let resNonNumLit = (nonNumLitFocus.type==='Atom')? [nonNumLitFocus]:
+                                   (nonNumLitFocus.value !=='*')? [nonNumLitFocus]:
+                                    nonNumLitFocus.rest;
+
                 currentCrumb.parent.rest[focusIndex] = {type:'Cons',
                     value: '*', rest: [ resCoe!, ...resNonNumLit ]
                 }
@@ -213,6 +221,46 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         zipper.goDown(focusIndex);
         // console.log("swap (sel, focus):", selectedIndex, focusIndex)
     }  
+    // FACTOR OUT COMMON FACTORS (cousin or uncle being the same atom)
+    else if (isFactorizable(zipper)){
+        console.log("FACTORIZE");
+        let currentCrumb = zipper.path.at(-1)!;
+        let focusIndex = zipper.path.at(-1)!.leftSiblings.length;
+        let selectedIndex = zipper.selected.leftSiblings.length;
+        let lca = lowestCommonAncester(zipper.selectedPath, zipper.path);
+        if (lca === null || lca.self.type==='Atom')return false;
+        let lcaLevel = zipper.path.indexOf(lca);
+        console.log("lcapos,", lcaLevel)
+        let lcaChildSelectedIndex = zipper.selectedPath[lcaLevel+1].leftSiblings.length;
+        let lcaChildFocusIndex = zipper.path[lcaLevel+1].leftSiblings.length;
+        let lcaChildSelTerm = zipper.selectedPath[lcaLevel+1].self;
+        let lcaChildFocusTerm = zipper.path[lcaLevel+1].self;
+        let isLCSelTermPositve = zipper.selectedPath[lcaLevel+1].self.value !== '-';
+        let isLCFocusTermPositve = zipper.path[lcaLevel+1].self.value !== '-';
+        //console.log("isFocus", isLCFocusTermPositve, "sel", isLCSelTermPositve)
+        //let selectedSiblings = [...zipper.selected.leftSiblings, ...zipper.selected.rightSiblings.toReversed()];
+        //let focusSiblings = [...currentCrumb.leftSiblings, ...currentCrumb.rightSiblings.toReversed()];
+        // Extract (delete) the chosen factor from selected and focus
+        removeNode(zipper, mode);
+        currentCrumb.parent.rest.splice(focusIndex, 1);
+        let factoredRemnant:SExpression = {type:'Cons', value:'+', 
+            rest: (lcaChildSelectedIndex < lcaChildFocusIndex?[lcaChildSelTerm,lcaChildFocusTerm]
+                                                             :[lcaChildFocusTerm,lcaChildSelTerm] ) }; 
+        console.log("FactorRem,", formatS(factoredRemnant));
+        //if (!isLCFocusTermPositve) insertOpAtTop(zipper.path.at(-2)!, null, null, '-');
+        //if (!isLCSelTermPositve) insertOpAtTop(zipper.selectedPath.at(-2)!, null, null, '-');
+        let newTerm:SExpression = {type:'Cons', value:'*', rest: [zipper.focus, factoredRemnant ]} ;
+        lca.self.rest.splice(lcaChildFocusIndex, 1, newTerm );
+        // Remove the branches in lca's child
+        let biggerIndex = Math.max(lcaChildSelectedIndex, lcaChildFocusIndex);
+        let smallerIndex = Math.min(lcaChildSelectedIndex, lcaChildFocusIndex);
+        lca.self.rest.splice(lcaChildSelectedIndex, 1);
+
+
+
+        resetSelected();  return true;
+    }
+
     // MOVE TERM to opposite side of equation
     else if (zipper.selectedPath.length <= 2 && zipper.path.length <= 2 // Only allow move top-2 layer
      && zipper.root.value === '='            // Only allow if this tree is an equation
@@ -289,8 +337,9 @@ function removeNode(zipper: Zipper, mode:'plus'|'mult'){
 }
 
 // given A,B, construct (+ A B) and redirect the pointers of parents (childIndex means being the n-th child)
-function insertOpAtTop(crumb: Crumb, newTerm: SExpression |null, childIndex: number, op = '+'): SExpression{
+function insertOpAtTop(crumb: Crumb, newTerm: SExpression |null, childIndex: number|null, op = '+'): SExpression{
     let res: SExpression;
+    if (childIndex === null) childIndex = crumb.leftSiblings.length;
     if (newTerm === null){
         res = { type: 'Cons', value: op, rest: [crumb.self] }
     }
@@ -327,7 +376,6 @@ export function simplifyTree(sNode: SExpression): SExpression {
         if (sNode.type === 'Atom') return sNode;
         // 1. Simplify all children first recursively
         const simplifiedChildren = sNode.rest.map(simplifyHelper);
-
         // 2. Handle Addition Rules: (+ x 0) -> x, (+ 0 y) -> y
         if (sNode.value === '+') {
             // Filter out any zeroes from the addition array
@@ -336,7 +384,6 @@ export function simplifyTree(sNode: SExpression): SExpression {
             );
             // Safety Guard: If EVERY child was 0 (e.g. 0 + 0), return a single solid '0' Atom
             if (nonZeroChildren.length === 0) {
-                
                 return { type: 'Atom', value: '0' };
             }
             // If only one non-zero child remains, the '+' operator is redundant!
@@ -346,27 +393,26 @@ export function simplifyTree(sNode: SExpression): SExpression {
             return { type: 'Cons', value: '+', rest: nonZeroChildren };
         }
 
-        // 3. Handle Multiplication Rules: (* x 0) -> 0
+        // 3. Handle Multiplication Rules: (* x 0) -> 0, (* x 1) -> x
         if (sNode.value === '*') {
-            // Filter out any ones from the addition array
+            // Rule A: Annihilation - If ANY child is 0, the whole multiplication becomes 0
+            const hasZero = simplifiedChildren.some(
+                child => child.type === 'Atom' && child.value === '0' );
+            if (hasZero) {
+                return { type: 'Atom', value: '0' }; }
+            // Rule B: Identity - Filter out '1's because multiplying by 1 changes nothing
             const nonOneChildren = simplifiedChildren.filter(
                 child => !(child.type === 'Atom' && child.value === '1')
             );
-            // Safety Guard: If EVERY child was 0 (e.g. 0 + 0), return a single solid '0' Atom
+            // Safety Guard: If EVERY child was 1 (e.g., 1 * 1 * 1), return a single '1' Atom
             if (nonOneChildren.length === 0) {
                 return { type: 'Atom', value: '1' };
             }
-            // If only one non-zero child remains, the '*' operator is redundant!
+            // Rule C: Redundancy - If only one non-one child remains (e.g., x * 1), drop the '*' operator
             if (nonOneChildren.length === 1) {
                 return nonOneChildren[0];
             }
-            const hasZero = simplifiedChildren.some(
-                child => child.type === 'Atom' && child.value === '0'
-            );
-            // Annihilation property: anything times 0 becomes a single solid 0
-            if (hasZero) {
-                return { type: 'Atom', value: '0' };
-            } else
+            // If multiple distinct variables remain (e.g., x * y), return the simplified node
             return { type: 'Cons', value: '*', rest: nonOneChildren };
         }
 
@@ -444,6 +490,62 @@ function getCoefficient(sNode: SExpression, negated:boolean= false):SExpression|
         return (!negated)? res[0] : {type:'Cons', value:'-', rest:[res[0]]};
     }
     return null;
+}
+
+// FOR FACTORING move, invoked after DESELECTION
+function isFactorizable(zipper: Zipper): boolean{
+    // Must have grandparents
+    let currentCrumb = zipper.path.at(-1)!;
+    if (zipper.selectedPath.length < 2 || zipper.selectedPath.length < 2) return false;
+    // At least one of selected / focus 's parent must be *
+    if (currentCrumb.parent.value !== '*' && zipper.selected!.parent.value !== '*') return false;
+    // Focus and Selected node must be the same formula
+
+    if (!( formatS(zipper.selected!.self) === formatS(zipper.focus) )) return false;
+    let lca = lowestCommonAncester(zipper.selectedPath, zipper.path);
+    // Lowest common ancester must be '+'
+    if (lca === null || lca.self.value !== '+') return false;
+    // Check if parent operators  up to lca follow rules ([Selected]->[-,+,*], [*]->[-,+], [-]->[+])
+    if ( !checkParentOpToLCA(zipper.selectedPath, lca.self) || !checkParentOpToLCA(zipper.path, lca.self) ) return false;
+
+
+    return true
+}
+// Helper 1 for isFactorizable
+function lowestCommonAncester(pathA: Crumb[], pathB: Crumb[]): Crumb | null {
+    let lca: Crumb | null = null;
+    let i = 0;
+    // Walk down both paths simultaneously from the root (index 0)
+    while (i < pathA.length && i < pathB.length) {
+        if (pathA[i].self === pathB[i].self) {
+            lca = pathA[i]; // Keep track of the latest shared ancestor
+            i++;
+        } else 
+            break; // The paths have diverged! Stop searching.
+    }
+    return lca;
+}
+// Helper 2 for isFactorizable
+function checkParentOpToLCA(path: Crumb[], lca: SExpression):boolean{
+    if (path.length === 0) return false;
+    if ( !['+','-','*'].includes(path.at(-1)!.parent.value)) return false;
+    let i = path.length-2;
+    while (i> 0 && path[i].self !== lca  ){
+        let selfNode = path[i].self; let parentNode = path[i].parent;
+        if (selfNode.value === '*' && !['-','+'].includes(parentNode.value) )
+            return false;
+        else if (selfNode.value === '-' && !['+'].includes(parentNode.value) )
+            return false;
+
+        i--;
+    }
+
+    return true;
+}
+// Helper for debugging
+function printPath(path: Crumb[]){
+    let res = path.map( (c) => c.self.value )
+    console.log("Path:", res.join(' ') )
 }
 
 
