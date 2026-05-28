@@ -14,7 +14,7 @@ const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
 const expressionInput = document.getElementById('expression-input') as HTMLInputElement;
 const mathDisplay = document.getElementById('math-display');
 const levelSelect = document.getElementById('level-select') as HTMLSelectElement;
-let activeMode : 'old' | 'nary' = 'old';
+let activeMode : 'old' | 'nary' = 'nary';
 let currentSExpression : SExpression | null;
 let currentRoot: TreeNode | null;   // Current Visual Tree root
 let currentZipper: Zipper | null = null;

@@ -78,7 +78,8 @@ export class TreeNode {
 }
 
 export function convertSToTree(sNode: SExpression, zipper: Zipper): TreeNode {
-  const treenode = new TreeNode(sNode.value);
+  // Only display 4 decimal places of a flaot
+  const treenode = new TreeNode(/\./.test(sNode.value)?Number(sNode.value).toFixed(4): sNode.value );
   //console.log("sNode:", formatS(sNode), "\nfocus:", formatS(zipper.focus));
   if (sNode === zipper.focus ) treenode.cursorAt = true;
   if (zipper.selected !== null && sNode === zipper.selected.self ) treenode.cursorSelected = true;

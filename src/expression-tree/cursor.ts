@@ -75,7 +75,20 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
     // console.log("selected:", formatS(zipper.selected.parent), "\nfocus:", formatS(zipper.path.at(-1)!.parent) );
     let focusIndex = zipper.path.at(-1)!.leftSiblings.length;
     if (zipper.selected.self === zipper.focus ){
-        console.log("Don't swap with yourself");
+        // Check if focus is float
+        if (zipper.focus.type === 'Atom' && isNumeric(zipper.focus.value) && /\./.test(zipper.focus.value)){
+            let currentCrumb = zipper.path.at(-1)!;
+            let fraction = convertToFraction(Number(zipper.focus.value));
+            let denominatorNode = { type: 'Cons', value: 'inv', rest: [
+                {type: 'Atom', value: fraction[1].toString() }
+            ] } satisfies SExpression;
+            insertOpAtTop(currentCrumb, denominatorNode, null, '*');
+            zipper.focus.value = fraction[0].toString();
+            zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
+            zipper.goDown(focusIndex);
+            resetSelected();  return false;
+        }
+        console.log("Swap with yourself only with floats.");
         // test
         // let non = nonNumLiteralTerm(zipper.focus)
         // zipper.focus = non;
@@ -200,8 +213,9 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
             currentCrumb.parent.rest[focusIndex] = res!;
             // Delete original selected node
             removeNode(zipper, mode);
+            zipper.goUp(); simplifyBranch(zipper);
             resetSelected();
-            return true;
+            return false;
         }
         // Additive / Multiplicative inverse annihilation
         if ( zipper.focus.type !== 'Atom' && ['-','inv'].includes(zipper.focus.value) ){
@@ -219,7 +233,8 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
                     currentCrumb.parent.rest[focusIndex] = {type:'Atom', value:'1'};
                     removeNode(zipper, mode);
                 }
-                resetSelected();  return true;
+                zipper.goUp();  simplifyBranch(zipper);
+                resetSelected();  return false;
             }
         }
         // Combine like terms
@@ -243,7 +258,8 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
                     value: '*', rest: [ resCoe!, ...resNonNumLit ]
                 }
                 removeNode(zipper, mode);
-                resetSelected();  return true;
+                zipper.goUp();  simplifyBranch(zipper);
+                resetSelected();  return false;
             }
         }
 
@@ -609,6 +625,112 @@ function snapToInteger(num: number, tol: number = 1e-8): number {
     }
     // Return the original number untouched if it's not close enough
     return num;
+}
+
+/** (by Gemini)
+ * Converts a floating-point decimal into its exact fractional representation
+ * using the highly efficient Continued Fractions (Euclidean-based) algorithm.
+ * * param decimal The target number (e.g., 1.33333333)
+ * param tolerance The threshold for acceptable accuracy (default 1e-8)
+ */
+function convertToFraction(decimal: number, tolerance: number = 1e-8): [number, number] {
+    // Handle whole integers immediately
+    if (Math.abs(decimal - Math.round(decimal)) < tolerance) {
+        return [ Math.round(decimal), 1 ];
+    }
+    let x = decimal;
+    // Setup state variables for tracking the convergent boundaries
+    let n1 = 1, d1 = 0; // Previous convergent numerator & denominator
+    let n2 = 0, d2 = 1; // Second previous convergent numerator & denominator
+    while (true) {
+        // Extract the absolute integer part
+        const a = Math.floor(x);
+        // Compute the new convergent numerator and denominator
+        const numerator = a * n1 + n2;
+        const denominator = a * d1 + d2;
+        // Verify if our current fraction matches the original decimal close enough
+        if (Math.abs(decimal - (numerator / denominator)) < tolerance) {
+            return [ numerator, denominator ];
+        }
+        // Shift our historical variables down for the next iteration cycle
+        n2 = n1;
+        d2 = d1;
+        n1 = numerator;
+        d1 = denominator;
+        // Isolate the fractional remainder and invert it
+        const fractionalPart = x - a;
+        if (fractionalPart < tolerance) break; // Hard stop on perfect termination
+        x = 1 / fractionalPart;
+    }
+    return [ n1, d1 ];
+}
+// Trim single factor or single plus term
+function simplifyBranch(zipper: Zipper){
+    if (zipper.focus.type==='Atom') return;
+    let crumb = zipper.path.at(-1)!;
+    let focusIndex = crumb.leftSiblings.length;
+    if ( zipper.focus.rest.length === 1 && ['+','*'].includes(zipper.focus.value)){
+        crumb.parent.rest[focusIndex] = zipper.focus.rest[0];
+    }
+    function simplifyHelper(sNode: SExpression): SExpression {
+        if (sNode.type === 'Atom') return sNode;
+        if (sNode.value === '+'){
+            sNode.rest.filter( (s) => s.value !== '0' )
+            if (sNode.rest.length === 0)
+                sNode.rest.push({type:'Atom', value:'0'});
+        }
+        if (sNode.value === '*'){
+            sNode.rest.filter( (s) => s.value !== '1' )
+            if (sNode.rest.length === 0)
+                sNode.rest.push({type:'Atom', value:'1'});
+        }
+        const simplifiedChildren = sNode.rest.map(simplifyHelper);
+        // 2. Handle Addition Rules: (+ x 0) -> x, (+ 0 y) -> y
+        if (sNode.value === '+') {
+            // Filter out any zeroes from the addition array
+            const nonZeroChildren = simplifiedChildren.filter(
+                child => !(child.type === 'Atom' && child.value === '0')
+            );
+            // Safety Guard: If EVERY child was 0 (e.g. 0 + 0), return a single solid '0' Atom
+            if (nonZeroChildren.length === 0) {
+                return { type: 'Atom', value: '0' };
+            }
+            // If only one non-zero child remains, the '+' operator is redundant!
+            if (nonZeroChildren.length === 1) {
+                return nonZeroChildren[0];
+            }
+            return { type: 'Cons', value: '+', rest: nonZeroChildren };
+        }
+
+        // 3. Handle Multiplication Rules: (* x 0) -> 0, (* x 1) -> x
+        if (sNode.value === '*') {
+            // Rule A: Annihilation - If ANY child is 0, the whole multiplication becomes 0
+            const hasZero = simplifiedChildren.some(
+                child => child.type === 'Atom' && child.value === '0' );
+            if (hasZero) {
+                return { type: 'Atom', value: '0' }; }
+            // Rule B: Identity - Filter out '1's because multiplying by 1 changes nothing
+            const nonOneChildren = simplifiedChildren.filter(
+                child => !(child.type === 'Atom' && child.value === '1')
+            );
+            // Safety Guard: If EVERY child was 1 (e.g., 1 * 1 * 1), return a single '1' Atom
+            if (nonOneChildren.length === 0) {
+                return { type: 'Atom', value: '1' };
+            }
+            // Rule C: Redundancy - If only one non-one child remains (e.g., x * 1), drop the '*' operator
+            if (nonOneChildren.length === 1) {
+                return nonOneChildren[0];
+            }
+            // If multiple distinct variables remain (e.g., x * y), return the simplified node
+            return { type: 'Cons', value: '*', rest: nonOneChildren };
+        }
+
+        // Default: Return the operator with its simplified children intact
+        return { type: 'Cons', value: sNode.value, rest: simplifiedChildren };
+    }
+
+    zipper.goUp();
+    zipper.goDown(focusIndex);
 }
 
 

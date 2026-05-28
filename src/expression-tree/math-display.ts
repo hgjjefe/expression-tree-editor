@@ -5,6 +5,10 @@ export function displayS(sNode: SExpression): string {
     // SExpression -> [Sstring, op, 'pre'|'in'|'post']
     function displayHelper(sNode: SExpression): [string, string | null, ('pre'|'in'|'post') | null] { 
         if ( sNode.type === 'Atom' || sNode.rest.length === 0){
+            // Only display 4 decimal places of a float
+            if (/\./.test(sNode.value) ){
+                return [Number(sNode.value).toFixed(4), null, null];
+            }
             return [sNode.value, null, null];
         }
         const op = sNode.value;
