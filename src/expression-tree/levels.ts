@@ -26,6 +26,7 @@ export const EQUATION_LEVELS  = ["x+1=2",
     "(4+3*x)/(5-2*x) = -((3*x)/(2*x+3)))",      // My own (Level 23)
     "(x+4)^2-x^2 = 12",
     "3/x+x/(x+1) = 1",
+    "x^2+3*x+2 = 0",
 
     // Examples
     " y/3 + y/4 = 7",

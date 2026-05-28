@@ -357,6 +357,18 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         if (lca === null || lca.self.type==='Atom')return false;
         let lcaLevel = zipper.path.indexOf(lca);
         console.log("lcapos,", lcaLevel)
+        if ( zipper.selected.parent === lca.self ){
+            console.log("AAAAAA")
+            insertOpAtTop(zipper.selected, {type:'Atom',value:'1'},null, '*')
+            zipper.goUp();
+            zipper.goDown(selectedIndex);
+            return false;
+        }else if ( currentCrumb.parent === lca.self ){
+            insertOpAtTop(currentCrumb, {type:'Atom',value:'1'},null, '*')
+            zipper.goUp();
+            zipper.goDown(focusIndex);
+            return false;
+        }
         let lcaChildSelectedIndex = zipper.selectedPath[lcaLevel+1].leftSiblings.length;
         let lcaChildFocusIndex = zipper.path[lcaLevel+1].leftSiblings.length;
         let lcaChildSelTerm = zipper.selectedPath[lcaLevel+1].self;
@@ -369,7 +381,7 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         let factoredRemnant:SExpression = {type:'Cons', value:'+', 
             rest: (lcaChildSelectedIndex < lcaChildFocusIndex?[lcaChildSelTerm,lcaChildFocusTerm]
                                                              :[lcaChildFocusTerm,lcaChildSelTerm] ) }; 
-        //console.log("FactorRem,", formatS(factoredRemnant));
+        console.log("FactorRem,", formatS(factoredRemnant));
         //if (!isLCFocusTermPositve) insertOpAtTop(zipper.path.at(-2)!, null, null, '-');
         //if (!isLCSelTermPositve) insertOpAtTop(zipper.selectedPath.at(-2)!, null, null, '-');
         let newTerm:SExpression = {type:'Cons', value:'*', rest: [zipper.focus, factoredRemnant ]} ;
