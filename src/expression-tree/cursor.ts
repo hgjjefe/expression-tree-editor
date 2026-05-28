@@ -213,7 +213,8 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
             currentCrumb.parent.rest[focusIndex] = res!;
             // Delete original selected node
             removeNode(zipper, mode);
-            zipper.goUp(); simplifyBranch(zipper);
+            zipper.goUp();
+            simplifyFocus(zipper);
             resetSelected();
             return false;
         }
@@ -233,7 +234,7 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
                     currentCrumb.parent.rest[focusIndex] = {type:'Atom', value:'1'};
                     removeNode(zipper, mode);
                 }
-                zipper.goUp();  simplifyBranch(zipper);
+                zipper.goUp();  simplifyFocus(zipper);;
                 resetSelected();  return false;
             }
         }
@@ -258,7 +259,7 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
                     value: '*', rest: [ resCoe!, ...resNonNumLit ]
                 }
                 removeNode(zipper, mode);
-                zipper.goUp();  simplifyBranch(zipper);
+                zipper.goUp();   simplifyFocus(zipper);;
                 resetSelected();  return false;
             }
         }
@@ -507,7 +508,7 @@ function evaluateNodes(op: string, sA: SExpression, sB: SExpression):SExpression
         let lA = parseNumLiteral(sA)!;
         let lB = parseNumLiteral(sB)!;
         let res:number|string = lA + lB;
-        res = snapToInteger( parseFloat( res.toFixed(10)));
+        res = snapToInteger(res);
         if (res >= 0)
             return { type:'Atom', value: res.toString() };
         else
@@ -516,14 +517,22 @@ function evaluateNodes(op: string, sA: SExpression, sB: SExpression):SExpression
         let lA = parseNumLiteral(sA)!;
         let lB = parseNumLiteral(sB)!;
         let res:number|string = lA * lB;
-        res = snapToInteger(parseFloat(res.toFixed(10)));
+        res = snapToInteger(res);
         //console.log('AB', lA, lB)
         if (res >= 0)
             return { type:'Atom', value: res.toString() };
         else
             return { type:'Cons', value: '-', rest: [ {type:'Atom', value: (-res).toString()}] };
-
 }
+// For displaying float to 4 decimal place (underlying has more d.p.)
+export function displayNum(num: string): string{
+    // If contains ".", then it is a float
+    if (/\./.test(num)){ 
+        return Number(num).toFixed(4).replace(/\.?0+$/, "")
+    }
+    return num; // unchanged otherwise
+}
+
 // Get the subtree excluding any number literals
 function nonNumLiteralFactor(sNode: SExpression): SExpression|null{
     if (sNode.type === 'Atom'){
@@ -665,6 +674,37 @@ function convertToFraction(decimal: number, tolerance: number = 1e-8): [number, 
     return [ n1, d1 ];
 }
 // Trim single factor or single plus term
+function simplify(sNode: SExpression): SExpression {
+    if (sNode.type === 'Atom') return sNode;
+
+    // 1. Map children to their simplified versions
+    sNode.rest = sNode.rest.map(child => simplify(child));
+
+    // 2. Identity Elimination
+    if (sNode.value === '+') {
+        sNode.rest = sNode.rest.filter(s => !(s.type === 'Atom' && s.value === '0'));
+        if (sNode.rest.length === 0) return { type: 'Atom', value: '0' };
+    } else if (sNode.value === '*') {
+        sNode.rest = sNode.rest.filter(s => !(s.type === 'Atom' && s.value === '1'));
+        if (sNode.rest.length === 0) return { type: 'Atom', value: '1' };
+    }
+    // 3. Singleton Collapsing
+    // If this node is a operator with only 1 child left, strip the operator and return the child!
+    if (['+', '*'].includes(sNode.value) && sNode.rest.length === 1) {
+        console.log("THIS", formatS(sNode.rest[0]))
+        return sNode.rest[0];
+    }
+    return sNode;
+}
+function simplifyFocus(zipper: Zipper){
+    let currentCrumb = zipper.path.at(-1)!;
+    let focusIndex = zipper.path.at(-1)!.leftSiblings.length;
+    currentCrumb.parent.rest[focusIndex] =  simplify(zipper.focus);
+    zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
+    zipper.goDown(focusIndex);
+}
+
+
 function simplifyBranch(zipper: Zipper){
     if (zipper.focus.type==='Atom') return;
     let crumb = zipper.path.at(-1)!;
@@ -672,67 +712,43 @@ function simplifyBranch(zipper: Zipper){
     if ( zipper.focus.rest.length === 1 && ['+','*'].includes(zipper.focus.value)){
         crumb.parent.rest[focusIndex] = zipper.focus.rest[0];
     }
-    function simplifyHelper(sNode: SExpression): SExpression {
+    function simplifyHelper(sNode: SExpression, sParent: SExpression, sIndex: number): SExpression {
         if (sNode.type === 'Atom') return sNode;
+        if (sParent.type === 'Atom') return sNode;
+        // Simplify singleton '+' or '*'
+        for (let i=0; i< sNode.rest.length; i++){
+            simplifyHelper(sNode.rest[i], sNode, i);
+        }
         if (sNode.value === '+'){
-            sNode.rest.filter( (s) => s.value !== '0' )
+            sNode.rest =  sNode.rest.filter( (s) => s.value !== '0' )
             if (sNode.rest.length === 0)
-                sNode.rest.push({type:'Atom', value:'0'});
-        }
-        if (sNode.value === '*'){
-            sNode.rest.filter( (s) => s.value !== '1' )
+                {sNode.rest.push({type:'Atom', value:'0'}); return sNode;}
+        } else if (sNode.value === '*'){
+            sNode.rest = sNode.rest.filter( (s) => s.value !== '1' )
             if (sNode.rest.length === 0)
-                sNode.rest.push({type:'Atom', value:'1'});
+                {sNode.rest.push({type:'Atom', value:'1'}); return sNode;}
         }
-        const simplifiedChildren = sNode.rest.map(simplifyHelper);
-        // 2. Handle Addition Rules: (+ x 0) -> x, (+ 0 y) -> y
-        if (sNode.value === '+') {
-            // Filter out any zeroes from the addition array
-            const nonZeroChildren = simplifiedChildren.filter(
-                child => !(child.type === 'Atom' && child.value === '0')
-            );
-            // Safety Guard: If EVERY child was 0 (e.g. 0 + 0), return a single solid '0' Atom
-            if (nonZeroChildren.length === 0) {
-                return { type: 'Atom', value: '0' };
-            }
-            // If only one non-zero child remains, the '+' operator is redundant!
-            if (nonZeroChildren.length === 1) {
-                return nonZeroChildren[0];
-            }
-            return { type: 'Cons', value: '+', rest: nonZeroChildren };
+        if (['+','*'].includes(sNode.value) && sNode.rest.length === 1){
+            sParent.rest[sIndex] = sNode.rest[0];
         }
 
-        // 3. Handle Multiplication Rules: (* x 0) -> 0, (* x 1) -> x
-        if (sNode.value === '*') {
-            // Rule A: Annihilation - If ANY child is 0, the whole multiplication becomes 0
-            const hasZero = simplifiedChildren.some(
-                child => child.type === 'Atom' && child.value === '0' );
-            if (hasZero) {
-                return { type: 'Atom', value: '0' }; }
-            // Rule B: Identity - Filter out '1's because multiplying by 1 changes nothing
-            const nonOneChildren = simplifiedChildren.filter(
-                child => !(child.type === 'Atom' && child.value === '1')
-            );
-            // Safety Guard: If EVERY child was 1 (e.g., 1 * 1 * 1), return a single '1' Atom
-            if (nonOneChildren.length === 0) {
-                return { type: 'Atom', value: '1' };
-            }
-            // Rule C: Redundancy - If only one non-one child remains (e.g., x * 1), drop the '*' operator
-            if (nonOneChildren.length === 1) {
-                return nonOneChildren[0];
-            }
-            // If multiple distinct variables remain (e.g., x * y), return the simplified node
-            return { type: 'Cons', value: '*', rest: nonOneChildren };
-        }
-
-        // Default: Return the operator with its simplified children intact
-        return { type: 'Cons', value: sNode.value, rest: simplifiedChildren };
+        return sNode;
     }
 
     zipper.goUp();
     zipper.goDown(focusIndex);
 }
 
+            // let child = sNode.rest[i];
+            // if (child.type==='Atom') continue;
+            // if (child.rest.length === 1 && ['+','*'].includes(child.value)){
+            //     sNode.rest[i] = child.rest[0];
+            // }
+        
+        
+        
+
+        // Default: Return the operator with its simplified children intact
 
 /*
 export function simplifyTree(sNode: SExpression): SExpression{

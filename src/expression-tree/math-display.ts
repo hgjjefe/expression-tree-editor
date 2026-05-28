@@ -1,5 +1,6 @@
 import { type SExpression  } from "./parser";
 import { getInfixBP, getPrefixBP, getPostfixBP, PREFIX_BINDING_POWERS } from "./binding-powers";
+import { displayNum } from "./cursor";
 
 export function displayS(sNode: SExpression): string {
     // SExpression -> [Sstring, op, 'pre'|'in'|'post']
@@ -7,7 +8,7 @@ export function displayS(sNode: SExpression): string {
         if ( sNode.type === 'Atom' || sNode.rest.length === 0){
             // Only display 4 decimal places of a float
             if (/\./.test(sNode.value) ){
-                return [Number(sNode.value).toFixed(4), null, null];
+                return [displayNum(sNode.value), null, null];
             }
             return [sNode.value, null, null];
         }
