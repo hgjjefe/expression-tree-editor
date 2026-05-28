@@ -228,11 +228,13 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
            && getCoefficient(zipper.selected.self) && getCoefficient(zipper.focus) ){
             let nonNumLitSelected = nonNumLiteralFactor(zipper.selected.self)!;
             let nonNumLitFocus = nonNumLiteralFactor(zipper.focus)!;
-            console.log("formatS:", formatS(nonNumLitSelected), formatS(nonNumLitFocus))
+            console.log("Terms to collect:", formatS(nonNumLitSelected), formatS(nonNumLitFocus))
             if ( formatS(nonNumLitSelected) == formatS(nonNumLitFocus) ){
                 let coeSelected = getCoefficient(zipper.selected.self)!;
                 let coeFocus = getCoefficient(zipper.focus)!;
+                //console.log("coes:", formatS(coeSelected), formatS(coeFocus));
                 let resCoe = evaluateNodes('+', coeSelected, coeFocus);
+                //console.log("rescoe:", formatS(resCoe));
                 let resNonNumLit = (nonNumLitFocus.type==='Atom')? [nonNumLitFocus]:
                                    (nonNumLitFocus.value !=='*')? [nonNumLitFocus]:
                                     nonNumLitFocus.rest;
@@ -404,7 +406,8 @@ export function isNumLiteral(sNode: SExpression): boolean{
     //     return true;
     // }
     if ( sNode.value !== '-'  ) return false;
-    return isNumeric( sNode.rest[0].value );
+    if ( sNode.rest[0].value === '-') return false; // Not accept (- (- (Term)))
+    return isNumLiteral( sNode.rest[0] );
 }
 
 
@@ -463,9 +466,12 @@ export function simplifyTree(sNode: SExpression): SExpression {
 }
 // Turn num literal node into a number type
 function parseNumLiteral(sNode: SExpression): number|null{
-    if ( !isNumLiteral(sNode) ) return null;
+    console.log("ADSA,", formatS(sNode))
+    if ( !isNumLiteral(sNode) ){
+        console.log("Cant parse non-numberLiteral."); return null;
+    } 
     if ( sNode.type === 'Atom' ) return Number(sNode.value);
-    if (sNode.value === '-' ) return -Number(sNode.rest[0].value);
+    if (sNode.value === '-' ) return -parseNumLiteral(sNode.rest[0])!;
     if (sNode.value === 'inv') return 1/Number(sNode.rest[0].value);
     return null
 }
@@ -486,7 +492,6 @@ function evaluateNodes(op: string, sA: SExpression, sB: SExpression):SExpression
         let lB = parseNumLiteral(sB)!;
         let res:number|string = lA + lB;
         res = snapToInteger( parseFloat( res.toFixed(10)));
-        //console.log('AB', lA, lB)
         if (res >= 0)
             return { type:'Atom', value: res.toString() };
         else
