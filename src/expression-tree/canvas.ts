@@ -152,7 +152,7 @@ function init() {
     expressionInput.value = SAMPLE_EXPRESSIONS[Math.floor(Math.random() * SAMPLE_EXPRESSIONS.length)]
     expressionInput.value = "(a - b) * (c + d) / z=t";
     expressionInput.value = " 5*(a*b) - c*(a*b) - 3 = 5"
-    expressionInput.value = " 5*2 +6 - 3 = 5"
+    expressionInput.value = " (x-3)*(x-4) = 0"
     setTimeout(() => {
         document.getElementById('canonicalize')!.click();
         // Add keyboard key detection for cursor control
@@ -253,6 +253,10 @@ function checkLevelWin(): boolean{  // Only win if equation is in the form " x =
         || currentSExpression.type === 'Atom') return false;
     let lhs = currentSExpression.rest[0]; let rhs = currentSExpression.rest[1];
     if (lhs.type !== 'Atom' || !/^[a-zA-Z]$/.test(lhs.value) ) return false;
+    if ( rhs.value === '∨' ){
+        if (rhs.type==='Atom')return false;
+        return  isNumLiteral(rhs.rest[0]) && isNumLiteral(rhs.rest[1])
+    }
     if ( !isNumLiteral(rhs)) return false;
     return true;
 }

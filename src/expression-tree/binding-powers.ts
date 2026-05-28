@@ -1,8 +1,7 @@
-type InfixOp = '='
-
 // Dictionary for infix binding powers
 const INFIX_BINDING_POWERS: Record<string, [number, number]> = {
     '=': [2, 1],
+    '∨': [3, 4],
     '+': [5, 6],
     '-': [5, 6],
     '*': [7, 8],

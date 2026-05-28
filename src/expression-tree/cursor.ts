@@ -75,7 +75,7 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
     // console.log("selected:", formatS(zipper.selected.parent), "\nfocus:", formatS(zipper.path.at(-1)!.parent) );
     let focusIndex = zipper.path.at(-1)!.leftSiblings.length;
     if (zipper.selected.self === zipper.focus ){
-        // Check if focus is float
+        // If double selects float, then turn into fractions
         if (zipper.focus.type === 'Atom' && isNumeric(zipper.focus.value) && /\./.test(zipper.focus.value)){
             let currentCrumb = zipper.path.at(-1)!;
             let fraction = convertToFraction(Number(zipper.focus.value));
@@ -88,7 +88,59 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
             zipper.goDown(focusIndex);
             resetSelected();  return false;
         }
-        console.log("Swap with yourself only with floats.");
+        // If double select int, then break it into half
+        if (zipper.focus.type === 'Atom' && isNumeric(zipper.focus.value) ){
+            let num = Number(zipper.focus.value);
+            if (!Number.isInteger(num) || num <= 1) 
+                {resetSelected();  return false;}
+            let halfA = Math.floor((Number(zipper.focus.value)+1)/2);
+            let halfB = Number(zipper.focus.value) - halfA;
+            let nodeA = {type:'Atom', value: halfA.toString()} satisfies SExpression;
+            let nodeB = {type:'Atom', value: halfB.toString()} satisfies SExpression;
+            zipper.path.at(-1)!.parent.rest.splice(focusIndex,1, 
+                {type:'Cons', value:'+', rest:[ nodeA, nodeB ]});
+            zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
+            zipper.goDown(focusIndex);
+            resetSelected();  return false;
+        }
+        // Unpack squared in '^'
+        if (zipper.focus.type==='Cons'&& zipper.focus.value==='^'
+         && zipper.focus.rest.length===2 && zipper.focus.rest[1].value==='2' ){
+            console.log("Unpack squared")
+            zipper.focus.rest[1] = structuredClone(zipper.focus.rest[0]);
+            zipper.path.at(-1)!.parent.rest[focusIndex] = zipper.focus;
+            zipper.focus.value = '*';
+            resetSelected();  return false;
+        }
+
+        if ( zipper.path.length === 1 && zipper.focus.value === '*'&& focusIndex === 0 ){
+            let res =  getFactoredQuadratic(zipper.root);
+            if (res===null) return false;
+            let factorA; let factorB;
+             [factorA, factorB] = res;
+            let variable = getVar(factorA);
+            if (zipper.root.type==='Atom')return false;
+            if (factorA.type==='Atom' || factorB.type==='Atom')return false;
+            zipper.root.rest.splice(0, 2);
+            zipper.root.rest.push({type:'Atom', value: variable});
+            let rootA = factorA.rest[1]
+            let rootB = factorB.rest[1]
+            if (rootA.type==='Cons'&& rootA.value === '-'){
+                rootA = rootA.rest[0];
+            }else{
+                rootA = { type:'Cons', value:'-', rest: [rootA] }
+            }
+            if (rootB.type==='Cons'&& rootB.value === '-'){
+                rootB = rootB.rest[0];
+            }else{
+                rootB = { type:'Cons', value:'-', rest: [rootB] }
+            }
+            zipper.root.rest.push( {type:'Cons', value: '∨', rest: 
+                [rootA, rootB] }  )
+            resetSelected();  return true;
+        }
+
+        console.log("Swap with yourself only with ints or floats or '^' or '*' in factored quadEq.");
         // test
         // let non = nonNumLiteralTerm(zipper.focus)
         // zipper.focus = non;
@@ -139,6 +191,7 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
             insertOpAtTop(currentCrumb, null, null, '-');
             zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
             zipper.goDown(focusIndex);
+            simplifyFocus(zipper);
             resetSelected();  return false;
         }
         // Pull out negatve outside inv: inv(-b)  => -inv(b)
@@ -219,7 +272,8 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
             return false;
         }
         // Additive / Multiplicative inverse annihilation
-        if ( zipper.focus.type !== 'Atom' && ['-','inv'].includes(zipper.focus.value) ){
+        if ( zipper.focus.type !== 'Atom' && ['+','*'].includes(zipper.selected.parent.value) &&
+            ['-','inv'].includes(zipper.focus.value) ){
             let selectedStr = formatS(zipper.selected.self); let focusStr=formatS(zipper.focus.rest[0]);
             if (selectedStr === focusStr ){
                 // removeOpAtTop(currentCrumb, focusIndex);
@@ -227,13 +281,13 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
                 let siblings = zipper.selected.parent.rest;
                 const largerIndex = Math.max(selectedIndex, focusIndex);
                 const smallerIndex = Math.min(selectedIndex, focusIndex);
-                if (zipper.focus.value === '-'){ // Delete both nodes
+                if (zipper.selected.parent.value==='+'&& zipper.focus.value === '-'){ // Delete both nodes
                     siblings.splice(largerIndex, 1);
                     siblings.splice(smallerIndex, 1);
-                } else{   // 'inv'
+                } else if (zipper.selected.parent.value==='*'&& zipper.focus.value === 'inv'){   // 'inv'
                     currentCrumb.parent.rest[focusIndex] = {type:'Atom', value:'1'};
                     removeNode(zipper, mode);
-                }
+                }else {resetSelected();  return false;}
                 zipper.goUp();  simplifyFocus(zipper);;
                 resetSelected();  return false;
             }
@@ -259,11 +313,32 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
                     value: '*', rest: [ resCoe!, ...resNonNumLit ]
                 }
                 removeNode(zipper, mode);
-                zipper.goUp();   simplifyFocus(zipper);;
+                zipper.goUp();   simplifyFocus(zipper);
                 resetSelected();  return false;
             }
         }
+        // Times 1: (* a 1) => (a)
+        if (zipper.selected.parent.value === '*' && zipper.selected.self.value === '1'){
+            removeNode(zipper, mode);
+            zipper.goUp();   simplifyFocus(zipper);
+            resetSelected();  return false;
+        }else if (zipper.selected.parent.value === '*' && zipper.focus.value === '1'){
+            zipper.focus = zipper.selected.self;
+            zipper.path.at(-1)!.parent.rest[focusIndex] = zipper.focus;
+            removeNode(zipper, mode);
+            zipper.goUp();   simplifyFocus(zipper);
+            resetSelected();  return false;
+        }
 
+        // Turn into squared:  (* a a) => (^ a 2)
+        if (zipper.selected.parent.value === '*' 
+            && formatS(zipper.selected.self) === formatS(zipper.focus)){
+            console.log("ADDA", zipper.path.at(-1)!)
+                insertOpAtTop(zipper.path.at(-1)!, {type:'Atom', value:'2'}, focusIndex, '^');
+            removeNode(zipper, mode);
+            zipper.goUp();   simplifyFocus(zipper);
+            resetSelected();  return false;
+        }
 
         // Swap selected node with current node
         let sNode = zipper.selected.parent
@@ -679,7 +754,6 @@ function simplify(sNode: SExpression): SExpression {
 
     // 1. Map children to their simplified versions
     sNode.rest = sNode.rest.map(child => simplify(child));
-
     // 2. Identity Elimination
     if (sNode.value === '+') {
         sNode.rest = sNode.rest.filter(s => !(s.type === 'Atom' && s.value === '0'));
@@ -691,7 +765,7 @@ function simplify(sNode: SExpression): SExpression {
     // 3. Singleton Collapsing
     // If this node is a operator with only 1 child left, strip the operator and return the child!
     if (['+', '*'].includes(sNode.value) && sNode.rest.length === 1) {
-        console.log("THIS", formatS(sNode.rest[0]))
+        //console.log("THIS", formatS(sNode.rest[0]))
         return sNode.rest[0];
     }
     return sNode;
@@ -738,6 +812,44 @@ function simplifyBranch(zipper: Zipper){
     zipper.goUp();
     zipper.goDown(focusIndex);
 }
+
+function isVariable(val: string): boolean{
+    return /[A-Za-z]/.test(val) && val.length === 1;
+}
+function getVar(factor:SExpression){
+    if (factor.type==='Atom') return factor.value;
+    return factor.rest[0].value;
+}
+
+// For solving quadratic equation  (x-A)*(x-B) = 0
+function getFactoredQuadratic(sNode: SExpression):[SExpression,SExpression]|null{
+    if (sNode.type==='Atom') return null;
+    if (sNode.rest[0].type==='Atom') return null;
+    if (sNode.rest[0].value !== '*' || sNode.rest[1].value !== '0') return null;
+    if (sNode.rest[0].rest.length !== 2) return null;
+    let factorA = sNode.rest[0].rest[0];
+    let factorB = sNode.rest[0].rest[1];
+
+    function isVarPlusNumLit(factor:SExpression){
+        if (factor.type==='Atom') return false;
+        if (factor.value !== '+') return false;
+        if (factor.rest.length !== 2) return false;
+        if (!isVariable(factor.rest[0].value) ) return false;
+        if ( !isNumLiteral(factor.rest[1]) ) return false;
+        return true;
+    }
+    if ( getVar(factorA) !== getVar(factorB) ) return null;
+    if (factorA.type === 'Atom'){
+        return isVarPlusNumLit(factorB)? [factorA, factorB]: null;
+    };
+    if (factorB.type === 'Atom'){
+        return isVarPlusNumLit(factorA)? [factorA, factorB]: null;
+    };
+    if (!isVarPlusNumLit(factorA) || !isVarPlusNumLit(factorB) ) return null;
+    if (factorA.rest[0].value !== factorB.rest[0].value ) return null;
+    return [factorA, factorB];
+}
+
 
             // let child = sNode.rest[i];
             // if (child.type==='Atom') continue;

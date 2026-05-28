@@ -70,14 +70,14 @@ export function displayS(sNode: SExpression): string {
                 }
                 childStrings = stack;
             } 
-            else if (op === '=' || op === '+'){
+            else if (op === '=' || op === '+'){ // Also turn 'inv' into latex frac
                 childStrings = childStrings.map( (cStr) => {
                     if (cStr.length >= 3 && cStr.slice(0,3) === 'inv' )
                         cStr = `\\frac{1}{${cStr.slice(4,-1)}}`
                     return cStr;
                 })
-            }
-            return [ childStrings.join(op), op, 'in'];
+            }  // Turn '*' into \cdot
+            return [ childStrings.join(op==='*'?'\\cdot ':op), op, 'in'];
         }
         // Unary operator
         let [sString, cOp, cFix] = displayHelper(sNode.rest[0]);
