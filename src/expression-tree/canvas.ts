@@ -155,7 +155,7 @@ function init() {
     
     expressionInput.value = SAMPLE_EXPRESSIONS[Math.floor(Math.random() * SAMPLE_EXPRESSIONS.length)]
     expressionInput.value = "(a - b) * (c + d) / z=t";
-    expressionInput.value = " 5+c*(a*b)+2 - (a*b) - 3 = 5"
+    expressionInput.value = " c*(a*b)+2 - (a*b) - 3 = 5"
     setTimeout(() => {
         document.getElementById('canonicalize')!.click();
         // Add keyboard key detection for cursor control

@@ -1,4 +1,4 @@
-import { type SExpression, formatS } from './parser';
+import { type SExpression } from './parser';
 import { Zipper } from './zipper';
 import { displayNum } from './cursor';
 

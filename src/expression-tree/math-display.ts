@@ -1,5 +1,5 @@
 import { type SExpression  } from "./parser";
-import { getInfixBP, getPrefixBP, getPostfixBP, PREFIX_BINDING_POWERS } from "./binding-powers";
+import { getInfixBP, getPrefixBP, getPostfixBP } from "./binding-powers";
 import { displayNum } from "./cursor";
 
 export function displayS(sNode: SExpression): string {

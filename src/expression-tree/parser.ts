@@ -1,6 +1,6 @@
 /* Inspired by Matklad: Simple but Powerful Pratt Parsing
 https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html */
-import { Lexer, type Token } from './lexer';
+import { Lexer } from './lexer';
 import { getInfixBP, getPrefixBP, getPostfixBP } from './binding-powers';
 
 // N-ary tree data structure to hold expressions

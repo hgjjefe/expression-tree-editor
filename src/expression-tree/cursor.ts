@@ -1,4 +1,4 @@
-import { type SExpression, formatS, type Atom, type Cons } from './parser';
+import { type SExpression, formatS, type Cons } from './parser';
 import { Zipper, type Crumb } from './zipper'
 
 // Helper function to swap array elements
