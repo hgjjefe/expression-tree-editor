@@ -110,6 +110,7 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
                 {resetSelected();  return false;}
             let pfs = primeFactors(num);
             let pfNodes: SExpression[] = pfs.map( (p) => ({type:'Atom', value:p.toString()})  );
+            if (pfNodes.length===1) pfNodes.unshift( {type: 'Atom', value: '1'} );
             zipper.path.at(-1)!.parent.rest.splice(focusIndex,1, 
                 {type:'Cons', value:'*', rest: pfNodes});
             zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
@@ -197,6 +198,25 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
                 childNode = {type: 'Cons', value: '-', rest: [childNode] };
                 zipper.selected.self.rest[i] = childNode;
             }
+            resetSelected();  return false;
+        }
+        // Pull negative out of a sum: A - B  => -(-A + B)
+        if (zipper.selected.self.value === '-' && zipper.focus.value === '+') {
+            if (zipper.selected.self.type==='Atom')return false;
+            zipper.focus.rest[selectedIndex] = zipper.selected.self.rest[0];
+            currentCrumb.parent.rest[focusIndex] = zipper.selected.self;
+            currentCrumb.parent.rest[focusIndex].rest[0] = zipper.focus;
+            for (let i=0;i<zipper.focus.rest.length; i++){
+                if (i=== selectedIndex) continue;
+                let childNode = zipper.focus.rest[i];
+                childNode = {type: 'Cons', value: '-', rest: [childNode] };
+                zipper.focus.rest[i] = childNode;
+            }
+            zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
+            zipper.goDown(focusIndex);
+            // console.log("FOCUS,", formatS(zipper.focus))
+            // console.log("selected idx", selectedIndex);
+            
             resetSelected();  return false;
         }
         // Pull out negatve outside factor:  a*-b  => -(a*b)
@@ -288,7 +308,7 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         }
         // Additive / Multiplicative inverse annihilation
         if ( zipper.focus.type !== 'Atom' && ['+','*'].includes(zipper.selected.parent.value) &&
-            ['-','inv'].includes(zipper.focus.value) ){
+            ['-','inv'].includes(zipper.focus.value) && mode === 'plus' ){
             let selectedStr = formatS(zipper.selected.self); let focusStr=formatS(zipper.focus.rest[0]);
             if (selectedStr === focusStr ){
                 // removeOpAtTop(currentCrumb, focusIndex);
@@ -300,6 +320,25 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
                     siblings.splice(largerIndex, 1);
                     siblings.splice(smallerIndex, 1);
                 } else if (zipper.selected.parent.value==='*'&& zipper.focus.value === 'inv'){   // 'inv'
+                    currentCrumb.parent.rest[focusIndex] = {type:'Atom', value:'1'};
+                    removeNode(zipper, mode);
+                }else {resetSelected();  return false;}
+                zipper.goUp();  simplifyFocus(zipper);;
+                resetSelected();  return false;
+            }  // The other case of annihiation (focus and selected switched place)
+        }else if ( zipper.selected.self.type !== 'Atom' && ['+','*'].includes(zipper.selected.parent.value) &&
+            ['-','inv'].includes(zipper.selected.self.value) && mode === 'plus' ){
+            let selectedStr = formatS(zipper.selected.self.rest[0]); let focusStr=formatS(zipper.focus);
+            if (selectedStr === focusStr ){
+                // removeOpAtTop(currentCrumb, focusIndex);
+                // removeNode(zipper, selectedIndex, mode);
+                let siblings = zipper.selected.parent.rest;
+                const largerIndex = Math.max(selectedIndex, focusIndex);
+                const smallerIndex = Math.min(selectedIndex, focusIndex);
+                if (zipper.selected.parent.value==='+'&& zipper.selected.self.value === '-'){ // Delete both nodes
+                    siblings.splice(largerIndex, 1);
+                    siblings.splice(smallerIndex, 1);
+                } else if (zipper.selected.parent.value==='*'&& zipper.selected.self.value === 'inv'){   // 'inv'
                     currentCrumb.parent.rest[focusIndex] = {type:'Atom', value:'1'};
                     removeNode(zipper, mode);
                 }else {resetSelected();  return false;}
@@ -348,8 +387,7 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         // Turn into squared:  (* a a) => (^ a 2)
         if (zipper.selected.parent.value === '*' 
             && formatS(zipper.selected.self) === formatS(zipper.focus)){
-            console.log("ADDA", zipper.path.at(-1)!)
-                insertOpAtTop(zipper.path.at(-1)!, {type:'Atom', value:'2'}, focusIndex, '^');
+            insertOpAtTop(zipper.path.at(-1)!, {type:'Atom', value:'2'}, focusIndex, '^');
             removeNode(zipper, mode);
             zipper.goUp();   simplifyFocus(zipper);
             resetSelected();  return false;
@@ -366,17 +404,23 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
     else if (isFactorizable(zipper)){
         console.log("FACTORIZE:", formatS(zipper.focus));
         let currentCrumb = zipper.path.at(-1)!;
+        let selectedNode = zipper.selected.self;
         let focusIndex = zipper.path.at(-1)!.leftSiblings.length;
         let selectedIndex = zipper.selected.leftSiblings.length;
         let lca = lowestCommonAncester(zipper.selectedPath, zipper.path);
         if (lca === null || lca.self.type==='Atom')return false;
         let lcaLevel = zipper.path.indexOf(lca);
-        // if ( zipper.selected.parent === lca.self ){
+        // if ( zipper.selected.parent === lca.self || zipper.selected.parent.value==='-' ){
         //     insertOpAtTop(zipper.selected, {type:'Atom',value:'1'},null, '*')
-        //     //zipper.goUp();
+        //     // zipper.selectedPath.at(-1)!.self = lca.self.rest[selectedIndex];
+        //     // zipper.selectedPath.push( {
+        //     //         self: selectedNode,
+        //     //         parent: lca.self.rest[selectedIndex],
+        //     //         leftSiblings: [],
+        //     //         rightSiblings: lca.self.rest[selectedIndex].rest[1]  }); 
         //     //zipper.goDown(selectedIndex);
-        //     //return false;
-        // }else if ( currentCrumb.parent === lca.self ){
+            
+        // }else if ( currentCrumb.parent === lca.self || currentCrumb.parent.value==='-' ){
         //     insertOpAtTop(currentCrumb, {type:'Atom',value:'1'},null, '*')
         //     //zipper.goUp();
         //     //zipper.goDown(focusIndex);
@@ -395,22 +439,26 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         //let isLCSelTermPositve = zipper.selectedPath[lcaLevel+1].self.value !== '-';
         //let isLCFocusTermPositve = zipper.path[lcaLevel+1].self.value !== '-';
         // Extract (delete) the chosen factor from selected and focus
-        removeNode(zipper, mode);
-        currentCrumb.parent.rest.splice(focusIndex, 1);
+        if (currentCrumb.parent !== lca.self 
+            && !(currentCrumb.parent.type==='Cons'&& currentCrumb.parent.value === '-'
+            && lcaChildFocusTerm.type==='Cons') )
+            currentCrumb.parent.rest.splice(focusIndex, 1);
+        let isLastSplice: boolean = true;
         // Make 1 in  a + a*b  => a*(1+b)
         if ( zipper.selected.parent === lca.self ){
-            lcaChildSelTerm = {type:'Atom', value: '1'};
+            lcaChildSelTerm = {type:'Atom', value: '1'}; isLastSplice=false;
         }else if (zipper.selected.parent.type==='Cons'&& zipper.selected.parent.value === '-'
             && lcaChildSelTerm.type==='Cons' ){
-            lcaChildSelTerm.rest.push( {type:'Atom', value: '1'});
+            lcaChildSelTerm.rest[0] = {type:'Atom', value: '1'}; isLastSplice=false;
         }
         if ( currentCrumb.parent === lca.self ){
-            lcaChildFocusTerm = {type:'Atom', value: '1'};
+            lcaChildFocusTerm = {type:'Atom', value: '1'}; isLastSplice=true;
+            lca.self.rest[lcaChildFocusIndex] = lcaChildFocusTerm
         }else if (currentCrumb.parent.type==='Cons'&& currentCrumb.parent.value === '-'
             && lcaChildFocusTerm.type==='Cons' ){
-            lcaChildFocusTerm.rest.push( {type:'Atom', value: '1'});
+            lcaChildFocusTerm.rest[0] = ( {type:'Atom', value: '1'}); isLastSplice=true;
         }
-
+       // console.log('islast', isLastSplice)
         // console.log("New lcaselterm", formatS(lcaChildSelTerm))
         // console.log("new lcafocusterm", formatS(lcaChildFocusTerm))
         
@@ -424,6 +472,8 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         lca.self.rest.splice(lcaChildFocusIndex, 1, newTerm );
         // Remove the selected branch in lca's child
         lca.self.rest.splice(lcaChildSelectedIndex, 1);
+        if (isLastSplice)
+            removeNode(zipper, mode);
         resetSelected();  return true;
     }
 
@@ -603,7 +653,7 @@ export function simplifyTree(sNode: SExpression): SExpression {
 }
 // Turn num literal node into a number type
 function parseNumLiteral(sNode: SExpression): number|null{
-    console.log("ADSA,", formatS(sNode))
+    //console.log("ADSA,", formatS(sNode))
     if ( !isNumLiteral(sNode) ){
         console.log("Cant parse non-numberLiteral."); return null;
     } 

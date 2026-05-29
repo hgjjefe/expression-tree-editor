@@ -39,7 +39,7 @@ function render() {
 }
 
 // Make tree from new SExpression. Meant to offload the work of generateTree()
-function updateTree(isCanonicalize = false, newZipper = false){
+function updateTree(isCanonicalize = false, newZipper = false, isDisplay = true){
     // Canonicalize and update mathDisplay
     if (isCanonicalize){
         currentSExpression = canonicalize(currentSExpression!);
@@ -51,11 +51,14 @@ function updateTree(isCanonicalize = false, newZipper = false){
     if (currentZipper === null || newZipper)
         currentZipper = new Zipper(currentSExpression!);
     currentRoot = convertSToTree(currentSExpression!, currentZipper);
-    mathDisplay!.textContent = displayS(currentSExpression!);
+    if (isDisplay){
+        mathDisplay!.textContent = displayS(currentSExpression!);
                 if ((window as any).MathJax) {
                     (window as any).MathJax.typesetPromise([mathDisplay])
                         .catch((err: any) => console.log('MathJax typeset failed: ', err));
                 } 
+    }
+
     // Check level win (only once)
     if (!isWonLevel && checkLevelWin()){
         displayWinMessage();
@@ -151,8 +154,7 @@ function init() {
     
     expressionInput.value = SAMPLE_EXPRESSIONS[Math.floor(Math.random() * SAMPLE_EXPRESSIONS.length)]
     expressionInput.value = "(a - b) * (c + d) / z=t";
-    expressionInput.value = " 5*(a*b) - c*(a*b) - 3 = 5"
-    expressionInput.value = " a+a*b = 0"
+    expressionInput.value = " 5+c*(a*b)+2 - (a*b) - 3 = 5"
     setTimeout(() => {
         document.getElementById('canonicalize')!.click();
         // Add keyboard key detection for cursor control
@@ -166,26 +168,28 @@ function init() {
                     ) { return; }
                 if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Space', 'KeyF']
                     .includes( event.code )
-                  ) return; 
+                  ) return;
+                let isDisplay = true; 
                 switch (event.key){
                     case "ArrowDown":
                         event.preventDefault();
                         let midIndex = currentZipper.focus.type === 'Cons' ? Math.floor((currentZipper.focus.rest.length-1) / 2)  : 0
-                        currentZipper.goDown(midIndex); break;
+                        currentZipper.goDown(midIndex); isDisplay=false; break;
                     case "ArrowUp":
                         event.preventDefault();
-                        currentZipper.goUp(); break;
+                        currentZipper.goUp(); isDisplay=false; break;
                     case "ArrowLeft":
                         event.preventDefault();
-                        currentZipper.goLeft(); break;
+                        currentZipper.goLeft(); isDisplay=false; break;
                     case "ArrowRight":
                         event.preventDefault();
-                        currentZipper.goRight(); break;
+                        currentZipper.goRight(); isDisplay=false; break;
                 }
                 let isNewZipper = false;
                 switch (event.code){
                     case "Space":   // Select a node
                         event.preventDefault();
+                        if (currentZipper.selected === null) isDisplay = false;
                         isNewZipper =  selectNode(currentZipper, 'plus');  break;
                     case "KeyF":   // Select a node
                         event.preventDefault();
@@ -193,7 +197,7 @@ function init() {
                 }
                 if (isNewZipper)
                     currentSExpression = simplifyTree(currentSExpression!);
-                updateTree(false, isNewZipper);
+                updateTree(false, isNewZipper, isDisplay);
             })
         }
     }, 500);
