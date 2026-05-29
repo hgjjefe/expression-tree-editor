@@ -41,8 +41,9 @@ function assertValidMove(zipper: Zipper, mode: 'plus' | 'mult'): asserts zipper 
         throw new Error("Cannot move 0.");
     // Cant move to zero side in mult mode (to prevent 1=0 appearing)
     if (zipper.focus.value === '0' && mode === 'mult'
-    && (zipper.selected.self.type==='Atom'||zipper.selected.self.value !== 'inv' ))
-        throw new Error("Cant move factor to zero side.");
+    && ((zipper.selected.self.type==='Atom'||zipper.selected.self.value !== 'inv'))
+    && !isNumLiteral(zipper.selected.self) )
+        throw new Error("Cant move non-number factor to zero side.");
 
     // Check if selected node and destination are different sides
     if (zipper.selectedPath[0].self === zipper.path[0].self) 
@@ -91,8 +92,16 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         // If double select int in plus mode, then break it into half
         if (zipper.focus.type === 'Atom' && isNumeric(zipper.focus.value) && mode==='plus' ){
             let num = Number(zipper.focus.value);
-            if (!Number.isInteger(num) || num <= 1) 
+            if (!Number.isInteger(num) || num <= 0) 
                 {resetSelected();  return false;}
+            if (num === 1){  //  1 => 2 - 1  (for creating minus terms)
+                zipper.path.at(-1)!.parent.rest.splice(focusIndex,1, 
+                {type:'Cons', value:'+', rest:
+                    [ {type:'Atom', value:'2'}, {type:'Cons', value:'-', rest:[{type:'Atom', value:'1'}]} ]});
+                zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
+                zipper.goDown(focusIndex);
+                resetSelected();  return false;
+            }
             let halfA = Math.floor((Number(zipper.focus.value)+1)/2);
             let halfB = Number(zipper.focus.value) - halfA;
             let nodeA = {type:'Atom', value: halfA.toString()} satisfies SExpression;
@@ -106,8 +115,16 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         // If double select int in mult mode, then break it into prime factors
         if (zipper.focus.type === 'Atom' && isNumeric(zipper.focus.value) && mode==='mult' ){
             let num = Number(zipper.focus.value);
-            if (!Number.isInteger(num) || num <= 1) 
+            if (!Number.isInteger(num) || num <= 0) 
                 {resetSelected();  return false;}
+            if (num === 1){  //  1 => 2 * inv 2 
+                zipper.path.at(-1)!.parent.rest.splice(focusIndex,1, 
+                {type:'Cons', value:'*', rest:
+                    [ {type:'Atom', value:'2'}, {type:'Cons', value:'inv', rest:[{type:'Atom', value:'2'}]} ]});
+                zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
+                zipper.goDown(focusIndex);
+                resetSelected();  return false;
+            }
             let pfs = primeFactors(num);
             let pfNodes: SExpression[] = pfs.map( (p) => ({type:'Atom', value:p.toString()})  );
             if (pfNodes.length===1) pfNodes.unshift( {type: 'Atom', value: '1'} );
@@ -156,7 +173,17 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
             resetSelected();  return true;
         }
 
-        console.log("Swap with yourself only with ints or floats or '^' or '*' in factored quadEq.");
+        // Spawns times 1 for arbitray term
+        if (mode ==='mult'){
+            zipper.path.at(-1)!.parent.rest.splice(focusIndex,1, 
+                {type:'Cons', value:'*', rest:
+                    [ zipper.focus, {type:'Atom', value:'1'} ]});
+                zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
+                zipper.goDown(focusIndex);
+                resetSelected();  return false;
+        }
+
+        console.log("Swap with yourself only with ints or floats or '^' or  '*' in factored quadEq.");
         // test
         // let non = nonNumLiteralTerm(zipper.focus)
         // zipper.focus = non;
@@ -179,8 +206,10 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         } 
         let selectedIndex = zipper.selected.leftSiblings.length;
 
-        // Double Negation elimination
-        if (zipper.selected.self.value === '-' && zipper.focus.value === '-') {
+        // Double Negation / inverse elimination
+        if (zipper.selected.self.value === '-' && zipper.focus.value === '-'
+         || zipper.selected.self.value === 'inv' && zipper.focus.value === 'inv'
+        ) {
             if (zipper.selected.self.type==='Atom')return false;
             currentCrumb.parent.rest[focusIndex] = zipper.selected.self.rest[0]
             zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
@@ -238,6 +267,28 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
             zipper.goDown(focusIndex);
             resetSelected();  return false;
         }
+         // Break denominators inv(A*B)  => inv(A) * inv(B)
+        if (zipper.selected.self.value === '*' && zipper.focus.value === 'inv') {
+            if (zipper.selected.self.type==='Atom')return false;
+            currentCrumb.parent.rest[focusIndex] = zipper.selected.self;
+            zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
+            zipper.goDown(focusIndex);
+            for (let i=0;i<zipper.selected.self.rest.length; i++){
+                let childNode = zipper.selected.self.rest[i];
+                childNode = {type: 'Cons', value: 'inv', rest: [childNode] };
+                zipper.selected.self.rest[i] = childNode;
+            }
+            resetSelected();  return false;
+        }
+        // Evaluate inv a into float 1/a
+        if ( isNumeric(zipper.selected.self.value) && zipper.focus.value === 'inv'){
+            console.log('SDFDS')
+            currentCrumb.parent.rest[focusIndex] = zipper.focus.rest[0];
+            zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
+            zipper.goDown(focusIndex);
+            zipper.focus.value = (1/Number(zipper.focus.value)).toString();
+            resetSelected();  return false;
+        }
 
         // Unflatten out one term in '+' or '*' node with 3 or more terms (in mult mode)
         if ( ['+','*'].includes( zipper.focus.value) && zipper.focus.rest.length >= 3 
@@ -280,6 +331,17 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         let leftUncles = zipper.selectedPath.at(-2)!.leftSiblings;
         zipper.focus.rest.splice(leftUncles.length+1,0,zipper.selected.self)
         zipper.selected.parent.rest[0] = {type: 'Atom', value: '1'};
+    }
+    // SWAP WITH GRANDCHILD: Push neg back to factors: -(a*b) => a*-b
+    else if (zipper.path.length >=2 && zipper.path.at(-2)!.parent === zipper.selected.self
+    && zipper.selected.self.value ==='-' && zipper.path.at(-1)!.parent.value === '*'
+    ){
+        let currentCrumb = zipper.path.at(-1)!;
+        let selectedIndex = zipper.selected.leftSiblings.length;
+        currentCrumb.parent.rest[focusIndex] = {type:'Cons', value:'-', rest:[zipper.focus]}; 
+        zipper.selected.parent.rest[selectedIndex] = zipper.selected.self.rest[0];
+        resetSelected();
+        return true;
     }
 
     // SWAP SIBLINGS: Same parent means the two nodes are siblings
@@ -499,7 +561,7 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         let invertOp = mode === 'plus' ? '-' : 'inv'
         // ======= Transformation starts here =======
         // INVERT selected node
-        if (selectedNode.type === 'Atom' || ['+','*'].includes( selectedNode.value)||['-'].includes( selectedNode.value)&&mode==='mult'){
+        if (selectedNode.type === 'Atom' || ['+','*','inv'].includes( selectedNode.value)||['-'].includes( selectedNode.value)&&mode==='mult'){
             selectedNode = insertOpAtTop(zipper.selectedPath.at(-1)!, null, selectedIndex, invertOp)!;
         }else if ( ['-'].includes( selectedNode.value) && mode==='plus' || ['inv'].includes( selectedNode.value) && mode==='mult' )  {
             selectedNode = removeOpAtTop(zipper.selectedPath.at(-1)!, selectedIndex);

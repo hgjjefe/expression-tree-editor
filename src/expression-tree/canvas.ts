@@ -131,6 +131,7 @@ function init() {
         if ( target.tagName === "INPUT" || target.tagName === "TEXTAREA" ||target.isContentEditable) { return; }
         e.preventDefault();  document.getElementById('canonicalize')!.click();
     } else if (e.code === 'KeyE'){  // Swap both sides of equation
+        e.preventDefault();
         if (currentZipper === null || currentZipper.root.type==='Atom') return;
         swap(currentZipper.root.rest, 0, 1);
         updateTree(false, true);
