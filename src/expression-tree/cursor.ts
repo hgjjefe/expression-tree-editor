@@ -88,8 +88,8 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
             zipper.goDown(focusIndex);
             resetSelected();  return false;
         }
-        // If double select int, then break it into half
-        if (zipper.focus.type === 'Atom' && isNumeric(zipper.focus.value) ){
+        // If double select int in plus mode, then break it into half
+        if (zipper.focus.type === 'Atom' && isNumeric(zipper.focus.value) && mode==='plus' ){
             let num = Number(zipper.focus.value);
             if (!Number.isInteger(num) || num <= 1) 
                 {resetSelected();  return false;}
@@ -103,6 +103,19 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
             zipper.goDown(focusIndex);
             resetSelected();  return false;
         }
+        // If double select int in mult mode, then break it into prime factors
+        if (zipper.focus.type === 'Atom' && isNumeric(zipper.focus.value) && mode==='mult' ){
+            let num = Number(zipper.focus.value);
+            if (!Number.isInteger(num) || num <= 1) 
+                {resetSelected();  return false;}
+            let pfs = primeFactors(num);
+            let pfNodes: SExpression[] = pfs.map( (p) => ({type:'Atom', value:p.toString()})  );
+            zipper.path.at(-1)!.parent.rest.splice(focusIndex,1, 
+                {type:'Cons', value:'*', rest: pfNodes});
+            zipper.goUp();     // Renew the Crumb to fix siblings list being disordered
+            zipper.goDown(focusIndex);
+            resetSelected();  return false;
+        }
         // Unpack squared in '^'
         if (zipper.focus.type==='Cons'&& zipper.focus.value==='^'
          && zipper.focus.rest.length===2 && zipper.focus.rest[1].value==='2' ){
@@ -112,10 +125,12 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
             zipper.focus.value = '*';
             resetSelected();  return false;
         }
-
+        //  Check if double click '*' in  (x-A)*(x-B) = 0
         if ( zipper.path.length === 1 && zipper.focus.value === '*'&& focusIndex === 0 ){
             let res =  getFactoredQuadratic(zipper.root);
-            if (res===null) return false;
+            if (res===null) {
+                console.log("Equation not in (x-A)*(x-B) = 0 form")
+                resetSelected();  return false;}
             let factorA; let factorB;
              [factorA, factorB] = res;
             let variable = getVar(factorA);
@@ -356,41 +371,59 @@ export function selectNode(zipper: Zipper, mode : 'plus'|'mult' = "plus"): boole
         let lca = lowestCommonAncester(zipper.selectedPath, zipper.path);
         if (lca === null || lca.self.type==='Atom')return false;
         let lcaLevel = zipper.path.indexOf(lca);
-        console.log("lcapos,", lcaLevel)
-        if ( zipper.selected.parent === lca.self ){
-            console.log("AAAAAA")
-            insertOpAtTop(zipper.selected, {type:'Atom',value:'1'},null, '*')
-            zipper.goUp();
-            zipper.goDown(selectedIndex);
-            return false;
-        }else if ( currentCrumb.parent === lca.self ){
-            insertOpAtTop(currentCrumb, {type:'Atom',value:'1'},null, '*')
-            zipper.goUp();
-            zipper.goDown(focusIndex);
-            return false;
-        }
+        // if ( zipper.selected.parent === lca.self ){
+        //     insertOpAtTop(zipper.selected, {type:'Atom',value:'1'},null, '*')
+        //     //zipper.goUp();
+        //     //zipper.goDown(selectedIndex);
+        //     //return false;
+        // }else if ( currentCrumb.parent === lca.self ){
+        //     insertOpAtTop(currentCrumb, {type:'Atom',value:'1'},null, '*')
+        //     //zipper.goUp();
+        //     //zipper.goDown(focusIndex);
+        //     //return false;
+        // }
         let lcaChildSelectedIndex = zipper.selectedPath[lcaLevel+1].leftSiblings.length;
         let lcaChildFocusIndex = zipper.path[lcaLevel+1].leftSiblings.length;
-        let lcaChildSelTerm = zipper.selectedPath[lcaLevel+1].self;
-        let lcaChildFocusTerm = zipper.path[lcaLevel+1].self;
+        let lcaChildSelTerm = lca.self.rest[lcaChildSelectedIndex];
+        let lcaChildFocusTerm =  lca.self.rest[lcaChildFocusIndex];
+        // console.log("lcapos,", lcaLevel)
+        // console.log("lca", formatS(lca.self))
+        // console.log("selected:", formatS(zipper.selected.self));
+        // console.log("focus:", formatS(zipper.focus))
+        // console.log("lca selterm", formatS(lcaChildSelTerm))
+        // console.log("lca focusterm", formatS(lcaChildFocusTerm))
         //let isLCSelTermPositve = zipper.selectedPath[lcaLevel+1].self.value !== '-';
         //let isLCFocusTermPositve = zipper.path[lcaLevel+1].self.value !== '-';
         // Extract (delete) the chosen factor from selected and focus
         removeNode(zipper, mode);
         currentCrumb.parent.rest.splice(focusIndex, 1);
+        // Make 1 in  a + a*b  => a*(1+b)
+        if ( zipper.selected.parent === lca.self ){
+            lcaChildSelTerm = {type:'Atom', value: '1'};
+        }else if (zipper.selected.parent.type==='Cons'&& zipper.selected.parent.value === '-'
+            && lcaChildSelTerm.type==='Cons' ){
+            lcaChildSelTerm.rest.push( {type:'Atom', value: '1'});
+        }
+        if ( currentCrumb.parent === lca.self ){
+            lcaChildFocusTerm = {type:'Atom', value: '1'};
+        }else if (currentCrumb.parent.type==='Cons'&& currentCrumb.parent.value === '-'
+            && lcaChildFocusTerm.type==='Cons' ){
+            lcaChildFocusTerm.rest.push( {type:'Atom', value: '1'});
+        }
+
+        // console.log("New lcaselterm", formatS(lcaChildSelTerm))
+        // console.log("new lcafocusterm", formatS(lcaChildFocusTerm))
+        
         let factoredRemnant:SExpression = {type:'Cons', value:'+', 
             rest: (lcaChildSelectedIndex < lcaChildFocusIndex?[lcaChildSelTerm,lcaChildFocusTerm]
                                                              :[lcaChildFocusTerm,lcaChildSelTerm] ) }; 
-        console.log("FactorRem,", formatS(factoredRemnant));
+        // console.log("FactorRem,", formatS(factoredRemnant));
         //if (!isLCFocusTermPositve) insertOpAtTop(zipper.path.at(-2)!, null, null, '-');
         //if (!isLCSelTermPositve) insertOpAtTop(zipper.selectedPath.at(-2)!, null, null, '-');
         let newTerm:SExpression = {type:'Cons', value:'*', rest: [zipper.focus, factoredRemnant ]} ;
         lca.self.rest.splice(lcaChildFocusIndex, 1, newTerm );
         // Remove the selected branch in lca's child
         lca.self.rest.splice(lcaChildSelectedIndex, 1);
-
-
-
         resetSelected();  return true;
     }
 
@@ -790,40 +823,39 @@ function simplifyFocus(zipper: Zipper){
     zipper.goDown(focusIndex);
 }
 
+// function simplifyBranch(zipper: Zipper){
+//     if (zipper.focus.type==='Atom') return;
+//     let crumb = zipper.path.at(-1)!;
+//     let focusIndex = crumb.leftSiblings.length;
+//     if ( zipper.focus.rest.length === 1 && ['+','*'].includes(zipper.focus.value)){
+//         crumb.parent.rest[focusIndex] = zipper.focus.rest[0];
+//     }
+//     function simplifyHelper(sNode: SExpression, sParent: SExpression, sIndex: number): SExpression {
+//         if (sNode.type === 'Atom') return sNode;
+//         if (sParent.type === 'Atom') return sNode;
+//         // Simplify singleton '+' or '*'
+//         for (let i=0; i< sNode.rest.length; i++){
+//             simplifyHelper(sNode.rest[i], sNode, i);
+//         }
+//         if (sNode.value === '+'){
+//             sNode.rest =  sNode.rest.filter( (s) => s.value !== '0' )
+//             if (sNode.rest.length === 0)
+//                 {sNode.rest.push({type:'Atom', value:'0'}); return sNode;}
+//         } else if (sNode.value === '*'){
+//             sNode.rest = sNode.rest.filter( (s) => s.value !== '1' )
+//             if (sNode.rest.length === 0)
+//                 {sNode.rest.push({type:'Atom', value:'1'}); return sNode;}
+//         }
+//         if (['+','*'].includes(sNode.value) && sNode.rest.length === 1){
+//             sParent.rest[sIndex] = sNode.rest[0];
+//         }
 
-function simplifyBranch(zipper: Zipper){
-    if (zipper.focus.type==='Atom') return;
-    let crumb = zipper.path.at(-1)!;
-    let focusIndex = crumb.leftSiblings.length;
-    if ( zipper.focus.rest.length === 1 && ['+','*'].includes(zipper.focus.value)){
-        crumb.parent.rest[focusIndex] = zipper.focus.rest[0];
-    }
-    function simplifyHelper(sNode: SExpression, sParent: SExpression, sIndex: number): SExpression {
-        if (sNode.type === 'Atom') return sNode;
-        if (sParent.type === 'Atom') return sNode;
-        // Simplify singleton '+' or '*'
-        for (let i=0; i< sNode.rest.length; i++){
-            simplifyHelper(sNode.rest[i], sNode, i);
-        }
-        if (sNode.value === '+'){
-            sNode.rest =  sNode.rest.filter( (s) => s.value !== '0' )
-            if (sNode.rest.length === 0)
-                {sNode.rest.push({type:'Atom', value:'0'}); return sNode;}
-        } else if (sNode.value === '*'){
-            sNode.rest = sNode.rest.filter( (s) => s.value !== '1' )
-            if (sNode.rest.length === 0)
-                {sNode.rest.push({type:'Atom', value:'1'}); return sNode;}
-        }
-        if (['+','*'].includes(sNode.value) && sNode.rest.length === 1){
-            sParent.rest[sIndex] = sNode.rest[0];
-        }
+//         return sNode;
+//     }
 
-        return sNode;
-    }
-
-    zipper.goUp();
-    zipper.goDown(focusIndex);
-}
+//     zipper.goUp();
+//     zipper.goDown(focusIndex);
+// }
 
 function isVariable(val: string): boolean{
     return /[A-Za-z]/.test(val) && val.length === 1;
@@ -862,7 +894,36 @@ function getFactoredQuadratic(sNode: SExpression):[SExpression,SExpression]|null
     return [factorA, factorB];
 }
 
+function primeFactors(num: number): number[] {
+    const res: number[] = [];
+    let i = 2;
+    // We only need to check up to the square root of the changing number
+    while (i * i <= num) {
+        if (num % i === 0) {
+            res.push(i);
+            num /= i; // Reduce num immediately
+            // DO NOT increment i here, because i might be a repeated factor (e.g. 2 * 2)
+        } else {
+            i++; // Only move to the next number if i no longer divides num
+        }
+    }
+    // If num is still greater than 1 after the loop, the remaining num IS prime!
+    if (num > 1) {
+        res.push(num);
+    }
+    return res;
+}
 
+
+
+// function updatePath(path: Crumb[], steps: number=path.length){
+//     steps = Math.max( steps, path.length );
+//     let restIndices = path.map( (c) => c.leftSiblings.length );
+//     for (let i=0;i<steps;i++){
+//         path.pop();
+//     }
+
+// }
             // let child = sNode.rest[i];
             // if (child.type==='Atom') continue;
             // if (child.rest.length === 1 && ['+','*'].includes(child.value)){

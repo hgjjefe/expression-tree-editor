@@ -1,5 +1,6 @@
 /* Source:
-https://www.fklmstss.edu.hk/subject_website/school/2021/summer/f1/f1_math_e.pdf */
+https://www.fklmstss.edu.hk/subject_website/school/2021/summer/f1/f1_math_e.pdf 
+https://tutorial.math.lamar.edu/Problems/Alg/SolveQuadraticEqnsI.aspx  */
 export const EQUATION_LEVELS  = ["x+1=2",
     "x - 4 = -7",
     "2 - y = 10",
@@ -26,8 +27,10 @@ export const EQUATION_LEVELS  = ["x+1=2",
     "(4+3*x)/(5-2*x) = -((3*x)/(2*x+3)))",      // My own (Level 23)
     "(x+4)^2-x^2 = 12",
     "3/x+x/(x+1) = 1",
+    "(x-1/2)*(x-3/2) = 0",
     "x^2+3*x+2 = 0",
-
+    "x^2 - 15*x = -50",
+    "19*x = 7 - 6*x^2",
     // Examples
     " y/3 + y/4 = 7",
     "3*(x+1) = 2*x - 7"
