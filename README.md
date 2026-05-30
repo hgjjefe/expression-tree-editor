@@ -1,8 +1,8 @@
 ## Expression Tree Editor
 
 
-This website is based on lnogueir's [expression-tree-gen](https://github.com/lnogueir/expression-tree-gen)
-You can input an expression You can change the tree by selecting a node (**SPACE**) and then select a target (**SPACE** again or **F**). Different combinations of selected nodes and target nodes (called "gestures") will have different effect, such as swapping terms, moving terms to other side expanding brackets, 
+This website is based on lnogueir's [expression-tree-gen](https://github.com/lnogueir/expression-tree-gen).
+You can input an expression You can change the tree by selecting a node (**SPACE**) and then select a target (**SPACE** again or **F**). Different combinations of selected nodes and target nodes (called "gestures") will have different effect, such as swapping terms, moving terms to other side, expanding brackets, and factorization.
 
 ### Controls
 
@@ -61,6 +61,8 @@ Number * Variable -> Number * sameVariable : Collect like terms
 '-' -> parent '+' : Pull negative out of the sum.
 
 '-' -> grandchild where its parent is '*' : Push negative into factor.
+
+Term -> same Term under '+' : Factorize Term out of the sum.
 
 
 Int -> self (SPACE) : break into sum of halves
