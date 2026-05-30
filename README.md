@@ -31,6 +31,10 @@ You can input an expression You can change the tree by selecting a node (**SPACE
 
 **R** - Click "Canonicalize Expression". Also works as a reset button in equation editing.
 
+**L** - Next level
+
+**K** - Previous level
+
 
 ### Levels
 
