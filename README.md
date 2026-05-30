@@ -23,6 +23,8 @@ You can input an expression You can change the tree by selecting a node (**SPACE
 
 ###### Keyboard controls
 
+**WASD / Arrow keys** - Move the orange cursor
+
 **SPACE** - Select a node / its destination
 
 **F** - Select destination in 'mult' mode
