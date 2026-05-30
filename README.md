@@ -1,8 +1,8 @@
 ## Expression Tree Editor
 
 
-This website is based on lnogueir's expression-tree-gen
-ou can input an expression You can change the tree by selecting a node (**SPACE**) and then select a target (**SPACE** again or **F**). Different combinations of selected nodes and target nodes (called "gestures") will have different effect, such as swapping terms, moving terms to other side expanding brackets, 
+This website is based on lnogueir's [expression-tree-gen](https://github.com/lnogueir/expression-tree-gen)
+You can input an expression You can change the tree by selecting a node (**SPACE**) and then select a target (**SPACE** again or **F**). Different combinations of selected nodes and target nodes (called "gestures") will have different effect, such as swapping terms, moving terms to other side expanding brackets, 
 
 ### Controls
 
@@ -10,7 +10,7 @@ ou can input an expression You can change the tree by selecting a node (**SPACE*
 
 "Generate (old)" - Uses lnogueir's original code (but I removed the animations).
 
-"Generate (binary)" - Uses my pratt parsing algorithm. Supports + - * / ^ √.
+"Generate (binary)" - Parse expression into binary tree. Supports + - * / ^ √.
 
 "Clear" - Clear the expression text input.
 
@@ -38,6 +38,8 @@ There are 30 equation levels. You win the level only when you tranform the equat
 
 ### Gestures
 
+(This is a non-exhaustive list because I can't remember all.)
+
 Any node -> siblings : If no simplifcations, then swap them
 
 Top two/three levels node -> Other side's top two level node (SPACE) : Move PLUS/MINUS term to other side of equation
@@ -52,6 +54,14 @@ Number * Variable -> Number * sameVariable : Collect like terms
 
 '-' -> parent '-' : Double negation elimination
 
+'inv' -> parent 'inv' : Double inverse elimination
+
+'-' -> parent '*' : Pull negative out of the factor.
+
+'-' -> parent '+' : Pull negative out of the sum.
+
+'-' -> grandchild where its parent is '*' : Push negative into factor.
+
 
 Int -> self (SPACE) : break into sum of halves
 
@@ -65,8 +75,12 @@ Float -> self : Turn into fractions
 
 1 -> self (F) : Turns into 2 / 2
 
+Top level LHS '*' -> self  when equation in (x-A)*(x-B) form : Turns into x = A or B
 
 
+### Credits
 
+This is based on lnogueir's [expression-tree-gen](https://github.com/lnogueir/expression-tree-gen).
 
+I also referred to matklad's article [Simple but Powerful Pratt Parsing](https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html) for the pratt parser.
 
