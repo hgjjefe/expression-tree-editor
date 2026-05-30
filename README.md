@@ -40,9 +40,11 @@ There are 30 equation levels. You win the level only when you tranform the equat
 
 Any node -> siblings : If no simplifcations, then swap them
 
-Top two/three levels node -> Other side's top two level node : Move term to other side of equation
+Top two/three levels node -> Other side's top two level node (SPACE) : Move PLUS/MINUS term to other side of equation
 
-Number -> sibling Number  : Evaluate numbers
+Top two/three levels node -> Other side's top two level node (F) : Move MULT/INV term to other side of equation
+
+Number -> sibling Number  : Evaluate numbers (if evaluate fractions, then the result turns into float)
 
 Number * Variable -> Number * sameVariable : Collect like terms
 
@@ -56,6 +58,8 @@ Int -> self (SPACE) : break into sum of halves
 Composites -> self (F) : break into prime factors
 
 Prime -> self (SPACE) : Turns into Prime * 1
+
+Float -> self : Turn into fractions
 
 1 -> self (SPACE) : Turns into 2 - 1
 
