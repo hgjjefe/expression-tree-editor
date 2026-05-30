@@ -40,7 +40,7 @@ There are 30 equation levels. You win the level only when you tranform the equat
 
 (This is a non-exhaustive list because I can't remember all.)
 
-Any node -> siblings : If no simplifcations, then swap them
+Any node -> siblings : If no simplifcations, then swap them (use **F** to prevent simplifcations)
 
 Top two/three levels node -> Other side's top two level node (SPACE) : Move PLUS/MINUS term to other side of equation
 
