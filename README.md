@@ -93,7 +93,7 @@ Float -> self : Turn into fractions
 
 1 -> self (F) : Turns into 2 / 2
 
-Top level LHS '*' -> self  when equation in (x-A)*(x-B) form : Turns into x = A or B
+Top level LHS '\*' -> self  when equation in (x-A)*(x-B) form : Turns into x = A or B
                      
                      Note: Only works when A and B are ints or floats or inverses, not fractions.
 
