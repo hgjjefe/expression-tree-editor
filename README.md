@@ -56,6 +56,14 @@ Number -> sibling Number  : Evaluate numbers (if evaluate fractions, then the re
 
 Number * Variable -> Number * sameVariable : Collect like terms
 
+'+' -> parent '+' : Expand PLUS brackets
+
+'*' -> parent '*' : Expand MULT brackets
+
+'+' -> child (when >= 3 childs) (use **F**) : Unflattenr PLUS term (pull the child out of the sum)
+
+'*' -> child (when >= 3 childs) (use **F**) : Unflattenr MULT term (pull the child out of the product)
+
 '+' -> parent '*'|'-' : Expand brackets
 
 '-' -> parent '-' : Double negation elimination
@@ -69,6 +77,8 @@ Number * Variable -> Number * sameVariable : Collect like terms
 '-' -> grandchild where its parent is '*' : Push negative into factor.
 
 Term -> same Term under '+' : Factorize Term out of the sum.
+
+
 
 
 Int -> self (SPACE) : break into sum of halves
