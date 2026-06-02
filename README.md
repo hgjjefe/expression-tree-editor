@@ -2,7 +2,7 @@
 
 
 This website is based on lnogueir's [expression-tree-gen](https://github.com/lnogueir/expression-tree-gen).
-You can input an expression and visualize the expression tree. You can also change the tree by selecting a node (**SPACE**) and then select a target (**SPACE** again or **F**). Different combinations of selected nodes and target nodes (called "gestures") will have different effect, such as swapping terms, moving terms to other side, expanding brackets, and factorization.
+You can input an expression and visualize the expression tree. You can also change the tree by using the orange cursor to select a node (**SPACE**) and then select a target (**SPACE** again or **F**). Different combinations of selected nodes and target nodes (called "gestures") will have different effect, such as swapping terms, moving terms to other side, expanding brackets, and factorization.
 
 ### Controls
 
